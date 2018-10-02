@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.3'
+VERSION= '0.1.6'
 
 # API request building blocks
 API_VERSION= 'v1'
@@ -64,14 +64,20 @@ KEY_STATE_VEHICLE_LOCKED= 'locked'
 
 KEY_STATE_CHARGE_LEVEL= 'battery_level'
 KEY_STATE_CHARGE_STATE= 'charging_state'
+KEY_STATE_CHARGE_PENDING= 'scheduled_charging_pending'
+KEY_STATE_CHARGE_LIMIT= 'charge_limit_soc'
 
 
-VALUE_STATE_CHARGE_CHARGING_READY= 'Connected'
+VALUE_STATE_CHARGE_CHARGING_READY= ['Connected', 'Stopped']
 VALUE_STATE_CHARGE_BATTERY_LEVEL= 'battery_level'
+
 
 
 # API request result codes
 STATUS_CODE_OK= 200
+STATUS_RESPONSE= 'response'
+STATUS_RESPONSE_RESULT= 'result'
+STATUS_RESPONSE_REASON= 'reason'
 
 
 #
@@ -81,11 +87,17 @@ class TeslaRequest:
 
   # Constructor
   def __init__(self, arguments):
-    # First, validate our debug flag
+    # First, validate our debug and quiet flags
     if hasattr(arguments, 'debug'):
       self.debug= arguments.debug
     else:
       self.debug= False
+      
+    if hasattr(arguments, 'quiet'):
+      self.quiet= arguments.quiet
+    else:
+      self.quiet= False
+
 
     # Instantiate internal cache
     self.cache= {}
@@ -222,14 +234,15 @@ class TeslaRequest:
       response= requests.get(request, headers= headers)
 
     except Exception as error:
-      if self.debug:
+      if not self.quiet:
         print 'Could not obtain state of vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index))
-        if request:
-          print 'URL: {}'.format(request)
-        if headers:
-          print "Headers:"
-          print json.dumps(headers, sort_keys=True, indent=4, separators=(',', ': '))
+        if self.debug:
+          if request:
+            print 'URL: {}'.format(request)
+          if headers:
+            print "Headers:"
+            print json.dumps(headers, sort_keys=True, indent=4, separators=(',', ': '))
       raise error
 
     else:
@@ -341,7 +354,7 @@ class TeslaRequest:
       raise error
 
 
-  # Return full vehicle state dump for the specified vehicle
+  # Return charge state for the specified vehicle
   def get_charge_state(self, vehicle_index):
     try:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)
@@ -349,6 +362,11 @@ class TeslaRequest:
       if self.debug:
         print 'Could not access charge state for vehicle #{}'.format(vehicle_index)
       raise error
+
+
+  # Return charging limit for the specified vehicle
+  def get_charging_limit(self, vehicle_index):
+    return self.get_charge_state(vehicle_index)[KEY_STATE_CHARGE_LIMIT]
 
 
   # Return a list of open doors and trunks for the specified vehicle
@@ -394,8 +412,14 @@ class TeslaRequest:
   def is_ready_to_charge(self, vehicle_index):
     try:
       return (
-        self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
-        == VALUE_STATE_CHARGE_CHARGING_READY)
+        (self.__get_state(vehicle_index,
+                          REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
+          in VALUE_STATE_CHARGE_CHARGING_READY)
+        and
+        (self.__get_state(vehicle_index,
+                          REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_PENDING]
+          == True)
+        )
     except Exception as error:
       if self.debug:
         print 'Could not obtain charging state for vehicle named "{}"'.format(
@@ -413,3 +437,40 @@ class TeslaRequest:
         print 'Could not obtain charging state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index))
       raise error
+
+
+  # Issue a command to the specified vehicle
+  def issue_command(self, vehicle_index, command, payload):
+    headers= self.get_headers()
+    request= self.get_url() + OWNERAPI_VERSION + REQUEST_VEHICLES \
+      + '/' + str(self.get_vehicle_id(vehicle_index)) \
+      + '/command/' + command
+
+    response= requests.post(request, headers= headers, json= payload)
+
+    if response.status_code == STATUS_CODE_OK:
+      return response.json()[STATUS_RESPONSE][STATUS_RESPONSE_RESULT]
+    else:
+      if self.debug:
+        raise Exception('Failed to issue command "{}" to vehicle named "{}" (status code {})'.format(command, self.get_vehicle_name(vehicle_index), response.status_code), self, request, response.json())
+      else:
+        raise Exception('Failed to issue command "{}" to vehicle named "{}" (status code {})'.format(command, self.get_vehicle_name(vehicle_index), response.status_code))
+
+
+  # Issue a command to the specified vehicle to set its charging limit
+  def set_charging_limit(self, vehicle_index, limit):
+    payload= {'percent' : limit}
+
+    return self.issue_command(vehicle_index, 'set_charge_limit', payload)
+
+
+  # Issue a command to the specified vehicle to set maximum range charging limit
+  def set_charging_limit_max(self, vehicle_index):
+    payload= {}
+    return self.issue_command(vehicle_index, 'charge_max_range', payload)
+
+
+  # Issue a command to the specified vehicle to set standard charging limit
+  def set_charging_limit_standard(self, vehicle_index):
+    payload= {}
+    return self.issue_command(vehicle_index, 'charge_standard', payload)
