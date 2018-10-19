@@ -4,9 +4,9 @@ from codecs import open
 from os import path
 
 setup(name='teslarequest',
-      version='0.1.6',
+      version='0.1.7',
       description='Tesla Owner API access for vehicle queries and control',
-      url='',
+      url='https://github.com/nigelboid/tesla-minder',
       py_modules=['teslarequest'],
       author='Igor S. Livshits',
       license='MIT',

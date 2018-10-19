@@ -16,7 +16,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.4'
+VERSION= '0.0.5'
 
 MINIMUM_CHARGING_LEVEL= 50
 DEFAULT_CHARGING_LIMIT= 80
@@ -109,8 +109,14 @@ def main():
         name= request.get_vehicle_name(counter)
         vehicle_id= request.get_vehicle_id(counter)
         if options.debug:
+          print
+          print
           print '{:>14}: {}'.format(name, vehicle_id)
   
+        state= request.get_vehicle_online_state(counter)
+        if options.debug:
+            print '{:>18}: {}'.format('state', state)
+              
         open_doors= request.get_vehicle_open_doors_and_trunks(counter)
         if (len(open_doors) > 0):
           if options.debug:
@@ -187,6 +193,9 @@ def main():
           print error.args[0]
           for counter in xrange(1, len(error.args)):
             print '\t' + str(error.args[counter])
+        elif not options.quiet:
+          print 'Could not access vehicle named "{}" (status is {})'.format(name,
+            request.get_vehicle_online_state(counter))
           
         # skip to the next vehicle
         continue

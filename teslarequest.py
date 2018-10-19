@@ -10,7 +10,8 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.6'
+VERSION= '0.1.7'
+MAX_ATTEMPTS= 10
 
 # API request building blocks
 API_VERSION= 'v1'
@@ -33,7 +34,12 @@ REQUEST_DATA_COMMANDS= {  REQUEST_DATA_STATE_MOBILE_ACCESS : '/',
                           REQUEST_DATA_STATE_GUI : '/data_request/',
 }
 
+
+COMMAND_WAKE_UP= 'wake_up'
+
+
 CACHE_EXPIRATION_LIMIT= 300     # seconds
+ATTEMPT_RETRY_DELAY= 5          # seconds
 
 KEY_API_ID= 'id'
 KEY_API_SECRET= 'secret'
@@ -50,8 +56,10 @@ KEY_VEHICLES= 'response'
 KEY_VEHICLE_COUNT= 'count'
 KEY_VEHICLE_NAME= 'display_name'
 KEY_VEHICLE_ID= 'id'
+KEY_VEHICLE_ONLINE_STATE= 'state'
 
 KEY_RESPONSE= 'response'
+KEY_RESULT= 'result'
 KEY_CACHE_EXPIRATION= 'cache_expiration'
 
 KEY_STATE_VEHICLE_DOOR_DRIVER_FRONT= 'df'
@@ -70,11 +78,15 @@ KEY_STATE_CHARGE_LIMIT= 'charge_limit_soc'
 
 VALUE_STATE_CHARGE_CHARGING_READY= ['Connected', 'Stopped']
 VALUE_STATE_CHARGE_BATTERY_LEVEL= 'battery_level'
+VALUE_STATE_ONLINE_ASLEEP= 'asleep'
+VALUE_STATE_ONLINE_ONLINE= 'online'
+VALUE_STATE_ONLINE_OFFLINE= 'offline'
 
 
 
 # API request result codes
 STATUS_CODE_OK= 200
+STATUS_CODE_REQUEST_TIMEOUT= 408
 STATUS_RESPONSE= 'response'
 STATUS_RESPONSE_RESULT= 'result'
 STATUS_RESPONSE_REASON= 'reason'
@@ -160,7 +172,13 @@ class TeslaRequest:
     owner_api= self.__get_owner_api_parameters()
 
     try:
+      # URL validation code from SethRobertson https://github.com/gglockner/teslajson/pull/12/files
+      prefix='https://'
       owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
+      if (not owner_url.startswith(prefix) or '/' in owner_url[len(prefix):]
+      or not owner_url.endswith(('.teslamotors.com', '.tesla.com'))):
+        raise IOError('Unexpected token source URL <{}>'.format(owner_url))
+      
       client_id= owner_api[API_VERSION][KEY_API_ID]
       client_secret= owner_api[API_VERSION][KEY_API_SECRET]
     except Exception as error:
@@ -225,34 +243,28 @@ class TeslaRequest:
 
   # Obtain and cache indicated state of the specified vehicle
   def __cache_state(self, vehicle_index, state_type):
-    try:
+    if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_OFFLINE:
+      raise Exception('Vehicle named "{}" is offline'.format(self.get_vehicle_name(vehicle_index)))
+      
+    else:
+      if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_ASLEEP:
+        self.__wake_up(vehicle_index)
+      
       headers= self.get_headers()
       request= self.get_url() + OWNERAPI_VERSION + REQUEST_VEHICLES \
         + '/' + str(self.get_vehicle_id(vehicle_index)) \
         + REQUEST_DATA_COMMANDS[state_type] + state_type
-
+  
       response= requests.get(request, headers= headers)
-
-    except Exception as error:
-      if not self.quiet:
-        print 'Could not obtain state of vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
-        if self.debug:
-          if request:
-            print 'URL: {}'.format(request)
-          if headers:
-            print "Headers:"
-            print json.dumps(headers, sort_keys=True, indent=4, separators=(',', ': '))
-      raise error
-
-    else:
+      
       if response.status_code == STATUS_CODE_OK:
         state= response.json()[KEY_RESPONSE]
         state[KEY_CACHE_EXPIRATION]= time.time() + self.cache_expiration_limit
-
+  
         if vehicle_index not in self.cache:
           self.cache[vehicle_index]= {}
         self.cache[vehicle_index][state_type]= state
+          
       else:
         if self.debug:
           raise Exception('Could not obtain state of vehicle'
@@ -282,6 +294,39 @@ class TeslaRequest:
       raise error
 
 
+  # Wake up specified vehicle
+  def __wake_up(self, vehicle_index):
+    headers= self.get_headers()
+    request= self.get_url() + OWNERAPI_VERSION + REQUEST_VEHICLES \
+      + '/' + str(self.get_vehicle_id(vehicle_index)) \
+      + '/' + COMMAND_WAKE_UP
+      
+    awake= False
+    attempt= 0
+    while attempt < MAX_ATTEMPTS:
+      attempt+= 1
+      print 'Waking up {} (attempt #{})...'.format(self.get_vehicle_name(vehicle_index), attempt)
+      response= requests.post(request, headers= headers)
+      time.sleep(ATTEMPT_RETRY_DELAY)
+    
+      if response.status_code == STATUS_CODE_OK:
+        if response.json()[STATUS_RESPONSE][KEY_VEHICLE_ONLINE_STATE] == VALUE_STATE_ONLINE_ONLINE:
+          awake= True
+          self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]= VALUE_STATE_ONLINE_ONLINE
+          break
+
+    if not awake:
+      if self.debug:
+        raise Exception('Could not wake up vehicle'
+          + ' named "{}" (status code {})'.format(
+            self.get_vehicle_name(vehicle_index), response.status_code),
+          self, request, headers)
+      else:
+        raise Exception('Could not wake up vehicle'
+          + ' named "{}" (status code {})'.format(
+            self.get_vehicle_name(vehicle_index), response.status_code))
+              
+
   # Formulate and return stored token parameters
   def get_token(self):
     try:
@@ -307,6 +352,7 @@ class TeslaRequest:
     try:
       return {
         'Authorization' : self.token[KEY_TOKEN_TYPE] + ' ' + self.token[KEY_TOKEN],
+        'User-Agent' : 'teslarequest.py'
         }
     except Exception as error:
       if self.debug:
@@ -341,6 +387,16 @@ class TeslaRequest:
     except Exception as error:
       if self.debug:
         print 'Could not access the ID of vehicle #{}'.format(vehicle_index)
+      raise error
+
+
+  # Return the ID of the specified vehicle
+  def get_vehicle_online_state(self, vehicle_index):
+    try:
+      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]
+    except Exception as error:
+      if self.debug:
+        print 'Could not access the online state of vehicle #{}'.format(vehicle_index)
       raise error
 
 
