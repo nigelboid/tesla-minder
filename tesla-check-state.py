@@ -16,7 +16,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.5'
+VERSION= '0.0.7'
 
 MINIMUM_CHARGING_LEVEL= 50
 DEFAULT_CHARGING_LIMIT= 80
@@ -138,42 +138,59 @@ def main():
           else:
             print '{} is unlocked!'.format(name)
   
-        if request.get_charging_limit(counter) != options.charging_limit:
+        if (isinstance(request.is_vehicle_home(counter), str)):
           if options.debug:
-            print '{:>18}: set to {}% instead of {}%'.format(
-              'charging limit', request.get_charging_limit(counter), options.charging_limit)
-          else:
-            print '{} charging limit set to {}% instead of {}%'.format(
-              name, request.get_charging_limit(counter), options.charging_limit)
-  
-          if request.set_charging_limit(counter, options.charging_limit):
-            if options.debug:
-              print '{:>18}: reset to {}%'.format('charging limit', options.charging_limit)
-            else:
-              print '{} charging limit reset to {}%'.format(name, options.charging_limit)
-          else:
-            if options.debug:
-              print '{:>18}: failed reset!'.format('charging limit')
-            else:
-              print '{} failed charging limit reset!'.format(name)
+            print '{:>18}: {}'.format('location', request.is_vehicle_home(counter))
+        elif request.is_vehicle_home(counter):
+          if options.debug:
+            print '{:>18}: home'.format('location')
         else:
           if options.debug:
-            print '{:>18}: already set to {}'.format(
-              'charging limit', options.charging_limit)
-  
-        if request.is_ready_to_charge(counter):
-          if options.debug:
-            print '{:>18}: ready'.format('charging state')
-        elif (request.get_battery_level(counter) < options.min_battery_level):
-          if options.debug:
-            print '{:>18}: not ready but should be charging (level= {}%)!'.format(
-              'charging state', request.get_battery_level(counter))
+            print '{:>18}: not at home'.format('location')
+            
+        if request.is_vehicle_home(counter):
+          if request.get_charging_limit(counter) != options.charging_limit:
+            if options.debug:
+              print '{:>18}: set to {}% instead of {}%'.format(
+                'charging limit', request.get_charging_limit(counter), options.charging_limit)
+            else:
+              print '{} charging limit set to {}% instead of {}%'.format(
+                name, request.get_charging_limit(counter), options.charging_limit)
+    
+            if request.is_charging(counter):
+              if options.debug:
+                print '{:>18}: kept as is since the car is charging'.format('charging limit')
+              else:
+                print '{} kept as is since the car is charging'.format(name)
+            else:
+              if request.set_charging_limit(counter, options.charging_limit):
+                if options.debug:
+                  print '{:>18}: reset to {}%'.format('charging limit', options.charging_limit)
+                else:
+                  print '{} charging limit reset to {}%'.format(name, options.charging_limit)
+              else:
+                if options.debug:
+                  print '{:>18}: failed reset!'.format('charging limit')
+                else:
+                  print '{} failed charging limit reset!'.format(name)
           else:
-            print '{} is not ready to charge and is running low (level= {}%)!'.format(
-              name, request.get_battery_level(counter))
-        else:
-          if options.debug:
-            print '{:>18}: not ready'.format('charging state')
+            if options.debug:
+              print '{:>18}: already set to {}'.format(
+                'charging limit', options.charging_limit)
+    
+          if request.is_ready_to_charge(counter):
+            if options.debug:
+              print '{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(counter))
+          elif (request.get_battery_level(counter) < options.min_battery_level):
+            if options.debug:
+              print '{:>18}: not ready but should be charging (level= {}%)!'.format(
+                'charging state', request.get_battery_level(counter))
+            else:
+              print '{} is not ready to charge and is running low (level= {}%)!'.format(
+                name, request.get_battery_level(counter))
+          else:
+            if options.debug:
+              print '{:>18}: not ready ({}%)'.format('charging state', request.get_battery_level(counter))
   
   
         if options.debug:

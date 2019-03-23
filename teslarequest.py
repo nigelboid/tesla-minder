@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.7'
+VERSION= '0.1.11'
 MAX_ATTEMPTS= 10
 
 # API request building blocks
@@ -69,6 +69,7 @@ KEY_STATE_VEHICLE_DOOR_PASSENGER_REAR= 'pr'
 KEY_STATE_VEHICLE_DOOR_TRUNK_FRONT= 'ft'
 KEY_STATE_VEHICLE_DOOR_TRUNK_REAR= 'rt'
 KEY_STATE_VEHICLE_LOCKED= 'locked'
+KEY_STATE_VEHICLE_HOME= 'homelink_nearby'
 
 KEY_STATE_CHARGE_LEVEL= 'battery_level'
 KEY_STATE_CHARGE_STATE= 'charging_state'
@@ -77,10 +78,12 @@ KEY_STATE_CHARGE_LIMIT= 'charge_limit_soc'
 
 
 VALUE_STATE_CHARGE_CHARGING_READY= ['Connected', 'Stopped']
+VALUE_STATE_CHARGE_CHARGING_NOW= ['Charging']
 VALUE_STATE_CHARGE_BATTERY_LEVEL= 'battery_level'
 VALUE_STATE_ONLINE_ASLEEP= 'asleep'
 VALUE_STATE_ONLINE_ONLINE= 'online'
 VALUE_STATE_ONLINE_OFFLINE= 'offline'
+VALUE_STATE_UNKNOWN= 'unknown'
 
 
 
@@ -243,13 +246,12 @@ class TeslaRequest:
 
   # Obtain and cache indicated state of the specified vehicle
   def __cache_state(self, vehicle_index, state_type):
-    if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_OFFLINE:
-      raise Exception('Vehicle named "{}" is offline'.format(self.get_vehicle_name(vehicle_index)))
+    #if self.get_vehicle_online_state(vehicle_index) != VALUE_STATE_ONLINE_ONLINE:
+    #  self.__wake_up(vehicle_index)
+    
+    attempts= self.__wake_up(vehicle_index)
       
-    else:
-      if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_ASLEEP:
-        self.__wake_up(vehicle_index)
-      
+    if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_ONLINE:
       headers= self.get_headers()
       request= self.get_url() + OWNERAPI_VERSION + REQUEST_VEHICLES \
         + '/' + str(self.get_vehicle_id(vehicle_index)) \
@@ -267,9 +269,14 @@ class TeslaRequest:
           
       else:
         if self.debug:
+          if (attempts > 1):
+            plural_s= "s"
+          else:
+            plural_s= ""
+            
           raise Exception('Could not obtain state of vehicle'
-            + ' named "{}" (status code {})'.format(
-              self.get_vehicle_name(vehicle_index), response.status_code),
+            + ' named "{}" (status code {}) after {} attempt{}'.format(
+              self.get_vehicle_name(vehicle_index), response.status_code, attempts, plural_s),
             self, request, headers)
         else:
           raise Exception('Could not obtain state of vehicle'
@@ -305,7 +312,6 @@ class TeslaRequest:
     attempt= 0
     while attempt < MAX_ATTEMPTS:
       attempt+= 1
-      print 'Waking up {} (attempt #{})...'.format(self.get_vehicle_name(vehicle_index), attempt)
       response= requests.post(request, headers= headers)
       time.sleep(ATTEMPT_RETRY_DELAY)
     
@@ -325,6 +331,8 @@ class TeslaRequest:
         raise Exception('Could not wake up vehicle'
           + ' named "{}" (status code {})'.format(
             self.get_vehicle_name(vehicle_index), response.status_code))
+    else:
+      return attempt
               
 
   # Formulate and return stored token parameters
@@ -464,18 +472,45 @@ class TeslaRequest:
       raise error
 
 
+  # Return a boolean indicating the locked state for the specified vehicle
+  def is_vehicle_home(self, vehicle_index):
+    try:
+      home_state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+      
+      if (KEY_STATE_VEHICLE_HOME in home_state):
+        return home_state[KEY_STATE_VEHICLE_HOME]
+      else:
+        return VALUE_STATE_UNKNOWN
+    except Exception as error:
+      if self.debug:
+        print 'Could not obtain HomeLink state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index))
+      raise error
+
+
   # Return a boolean indicating charging readiness for the specified vehicle
   def is_ready_to_charge(self, vehicle_index):
     try:
       return (
-        (self.__get_state(vehicle_index,
-                          REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
+        ((self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
           in VALUE_STATE_CHARGE_CHARGING_READY)
         and
-        (self.__get_state(vehicle_index,
-                          REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_PENDING]
-          == True)
-        )
+        (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_PENDING]
+          == True))
+          
+        or self.is_charging(vehicle_index))
+    except Exception as error:
+      if self.debug:
+        print 'Could not obtain charging state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index))
+      raise error
+
+
+  # Return a boolean indicating charging readiness for the specified vehicle
+  def is_charging(self, vehicle_index):
+    try:
+      return (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
+          == VALUE_STATE_CHARGE_CHARGING_NOW)
     except Exception as error:
       if self.debug:
         print 'Could not obtain charging state for vehicle named "{}"'.format(
