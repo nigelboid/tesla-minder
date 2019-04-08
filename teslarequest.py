@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.11'
+VERSION= '0.1.13'
 MAX_ATTEMPTS= 10
 
 # API request building blocks
@@ -69,7 +69,7 @@ KEY_STATE_VEHICLE_DOOR_PASSENGER_REAR= 'pr'
 KEY_STATE_VEHICLE_DOOR_TRUNK_FRONT= 'ft'
 KEY_STATE_VEHICLE_DOOR_TRUNK_REAR= 'rt'
 KEY_STATE_VEHICLE_LOCKED= 'locked'
-KEY_STATE_VEHICLE_HOME= 'homelink_nearby'
+KEY_STATE_VEHICLE_HOMELINK= 'homelink_nearby'
 
 KEY_STATE_CHARGE_LEVEL= 'battery_level'
 KEY_STATE_CHARGE_STATE= 'charging_state'
@@ -419,6 +419,16 @@ class TeslaRequest:
 
 
   # Return charge state for the specified vehicle
+  def get_drive_state(self, vehicle_index):
+    try:
+      return self.__get_state(vehicle_index, REQUEST_DATA_STATE_DRIVE)
+    except Exception as error:
+      if self.debug:
+        print 'Could not access drive state for vehicle #{}'.format(vehicle_index)
+      raise error
+
+
+  # Return charge state for the specified vehicle
   def get_charge_state(self, vehicle_index):
     try:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)
@@ -446,7 +456,7 @@ class TeslaRequest:
       }
 
       open_doors= []
-      state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+      state= self.get_vehicle_state(vehicle_index)
       for door in doors.keys():
         if (state[door] != 0):
           open_doors.append(doors[door])
@@ -456,6 +466,20 @@ class TeslaRequest:
     except Exception as error:
       if self.debug:
         print 'Could not obtain open doors and trunks for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index))
+      raise error
+
+
+  # Return a list of open doors and trunks for the specified vehicle
+  def get_vehicle_location(self, vehicle_index):
+    try:
+      state= self.get_drive_state(vehicle_index)
+
+      return (state['latitude'], state['longitude'])
+
+    except Exception as error:
+      if self.debug:
+        print 'Could not obtain location for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index))
       raise error
 
@@ -473,12 +497,12 @@ class TeslaRequest:
 
 
   # Return a boolean indicating the locked state for the specified vehicle
-  def is_vehicle_home(self, vehicle_index):
+  def is_vehicle_near_homelink(self, vehicle_index):
     try:
-      home_state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+      state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
       
-      if (KEY_STATE_VEHICLE_HOME in home_state):
-        return home_state[KEY_STATE_VEHICLE_HOME]
+      if (KEY_STATE_VEHICLE_HOMELINK in state):
+        return state[KEY_STATE_VEHICLE_HOMELINK]
       else:
         return VALUE_STATE_UNKNOWN
     except Exception as error:

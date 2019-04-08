@@ -8,6 +8,7 @@
 import argparse
 import json
 import datetime
+import geopy.distance
 from teslarequest import TeslaRequest
 #from operator import itemgetter
 
@@ -16,10 +17,12 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.7'
+VERSION= '0.0.9'
 
-MINIMUM_CHARGING_LEVEL= 50
-DEFAULT_CHARGING_LIMIT= 80
+MINIMUM_CHARGING_LEVEL= 50  # percent
+DEFAULT_CHARGING_LIMIT= 80  # percent
+
+MAXIMUM_NEAR_DISTANCE= 10   # meters
 
 
 #
@@ -45,6 +48,13 @@ def GetArguments():
     default=[DEFAULT_CHARGING_LIMIT],
     help='Battery charging limit')
 
+  argumentParser.add_argument('-y', '--latitutde', '--home-latitude',
+    nargs=1, dest='home_latitude', type=float, required=False, action='store',
+    help='Home latitude coordinate')
+  argumentParser.add_argument('-x', '--longitude', '--home-longitude',
+    nargs=1, dest='home_longitude', type=float, required=False, action='store',
+    help='Home longitude coordinate')
+
 
   argumentParser.add_argument('-d', '--debug', dest='debug', required=False,
     action='store_true', default=False, help='Turn on verbose diagnostics')
@@ -66,7 +76,15 @@ def NormalizeArguments(options):
 
   # convert lists of single strings into strings
   options.token_file = str(options.token_file.pop())
-
+  
+  #if ((options.home_latitude in locals() or options.home_latitude in globals())
+  #and (options.home_longitude in locals() or options.home_longitude in globals()))
+  
+  if (options.home_latitude == None or options.home_longitude == None):
+    options.home= 'unknown'
+  else:
+    options.home= (options.home_latitude.pop(), options.home_longitude.pop())
+    
   return options
 
 
@@ -79,6 +97,79 @@ def GetToken(options):
   return options
 
 
+# Check vehicle drops, trunks, and locked state
+#
+def ReportSecure(request, vehicle_id, name, debug):
+  open_doors= request.get_vehicle_open_doors_and_trunks(vehicle_id)
+  if (len(open_doors) > 0):
+    if debug:
+      print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
+        open_doors)
+    else:
+      print 'Open door{}! {}: {}'.format(PluralS(len(open_doors)), name, open_doors)
+  else:
+    if debug:
+      print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
+        'all doors closed')
+
+  if request.is_vehicle_locked(vehicle_id):
+    if debug:
+      print '{:>18}: locked'.format('lock state')
+  else:
+    if debug:
+      print '{:>18}: unlocked'.format('lock state')
+    else:
+      print '{} is unlocked!'.format(name)
+
+
+# Is the cat at (near) home?
+#
+def IsHome(request, vehicle_id, home, debug):
+  if (isinstance(home, str)):
+    if debug:
+      print '{:>18}: {}'.format('home', home)
+      
+    return IsNearHomeLink(request, vehicle_id, debug)
+    
+  else:
+    if debug:
+      print '{:>18}: home location supplied {}'.format('home', home)
+    
+    distance= geopy.distance.distance(home, request.get_vehicle_location(vehicle_id)).m
+    if (distance < MAXIMUM_NEAR_DISTANCE):
+      if debug:
+        print '{:>18}: home'.format('location')
+        print '{:>18}: {} meters'.format('distance', round(distance, 2))
+        
+      return True
+    else:
+      if debug:
+        print '{:>18}: not at home'.format('location')
+        print '{:>18}: {} miles'.format('distance',
+          round(geopy.distance.distance(home, request.get_vehicle_location(vehicle_id)).miles, 3))
+        
+      return False
+    
+    
+# Is the cat near a programmed HomeLink?
+#
+def IsNearHomeLink(request, vehicle_id, debug):
+  isHome= request.is_vehicle_near_homelink(vehicle_id)
+  
+  if (isinstance(isHome, bool)):
+    if debug:
+      if isHome:
+        print '{:>18}: home'.format('location')
+      else:
+        print '{:>18}: not at home'.format('location')
+      
+    return isHome
+  else:
+    if debug:
+      print '{:>18}: {}'.format('location', isHome)
+    return False
+    
+
 # Should there be an 's' at the end?
 #
 def PluralS(number):
@@ -86,7 +177,6 @@ def PluralS(number):
     return ''
   else:
     return 's'
-
 
 
 # Main entry point
@@ -117,38 +207,9 @@ def main():
         if options.debug:
             print '{:>18}: {}'.format('state', state)
               
-        open_doors= request.get_vehicle_open_doors_and_trunks(counter)
-        if (len(open_doors) > 0):
-          if options.debug:
-            print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
-              open_doors)
-          else:
-            print 'Open door{}! {}: {}'.format(PluralS(len(open_doors)), name, open_doors)
-        else:
-          if options.debug:
-            print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
-              'all doors closed')
-  
-        if request.is_vehicle_locked(counter):
-          if options.debug:
-            print '{:>18}: locked'.format('lock state')
-        else:
-          if options.debug:
-            print '{:>18}: unlocked'.format('lock state')
-          else:
-            print '{} is unlocked!'.format(name)
-  
-        if (isinstance(request.is_vehicle_home(counter), str)):
-          if options.debug:
-            print '{:>18}: {}'.format('location', request.is_vehicle_home(counter))
-        elif request.is_vehicle_home(counter):
-          if options.debug:
-            print '{:>18}: home'.format('location')
-        else:
-          if options.debug:
-            print '{:>18}: not at home'.format('location')
-            
-        if request.is_vehicle_home(counter):
+        ReportSecure(request, counter, name, options.debug)
+        
+        if IsHome(request, counter, options.home, options.debug):
           if request.get_charging_limit(counter) != options.charging_limit:
             if options.debug:
               print '{:>18}: set to {}% instead of {}%'.format(
@@ -199,6 +260,9 @@ def main():
             sort_keys=True, indent=4, separators=(',', ': '))
           print
           print json.dumps(request.get_charge_state(counter),
+            sort_keys=True, indent=4, separators=(',', ': '))
+          print
+          print json.dumps(request.get_drive_state(counter),
             sort_keys=True, indent=4, separators=(',', ': '))
           print
           
