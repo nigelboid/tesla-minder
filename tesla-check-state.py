@@ -17,7 +17,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.9'
+VERSION= '0.0.10'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
@@ -77,9 +77,6 @@ def NormalizeArguments(options):
   # convert lists of single strings into strings
   options.token_file = str(options.token_file.pop())
   
-  #if ((options.home_latitude in locals() or options.home_latitude in globals())
-  #and (options.home_longitude in locals() or options.home_longitude in globals()))
-  
   if (options.home_latitude == None or options.home_longitude == None):
     options.home= 'unknown'
   else:
@@ -97,7 +94,7 @@ def GetToken(options):
   return options
 
 
-# Check vehicle drops, trunks, and locked state
+# Check vehicle doors, trunks, and locked state
 #
 def ReportSecure(request, vehicle_id, name, debug):
   open_doors= request.get_vehicle_open_doors_and_trunks(vehicle_id)
@@ -121,6 +118,86 @@ def ReportSecure(request, vehicle_id, name, debug):
     else:
       print '{} is unlocked!'.format(name)
 
+
+# Check vehicle charging limit and reset it, if necessary and appropriate
+#
+def CheckChargingLimit(request, vehicle_id, name, charging_limit, debug):
+  if request.get_charging_limit(vehicle_id) != charging_limit:
+    if debug:
+      print '{:>18}: set to {}% instead of {}%'.format(
+        'charging limit', request.get_charging_limit(vehicle_id), charging_limit)
+    else:
+      print '{} charging limit set to {}% instead of {}%'.format(
+        name, request.get_charging_limit(vehicle_id), charging_limit)
+
+    if request.is_charging(vehicle_id):
+      if debug:
+        print '{:>18}: kept as is since the car is charging'.format('charging limit')
+      else:
+        print '{} kept as is since the car is charging'.format(name)
+    else:
+      if request.set_charging_limit(vehicle_id, charging_limit):
+        if debug:
+          print '{:>18}: reset to {}%'.format('charging limit', charging_limit)
+        else:
+          print '{} charging limit reset to {}%'.format(name, charging_limit)
+      else:
+        if debug:
+          print '{:>18}: failed reset!'.format('charging limit')
+        else:
+          print '{} failed charging limit reset!'.format(name)
+  else:
+    if debug:
+      print '{:>18}: already set to {}'.format('charging limit', charging_limit)
+
+
+# Check vehicle charge level and report it if below threshold
+#
+def CheckChargeLevel(request, vehicle_id, name, min_battery_level, debug):
+  if request.is_ready_to_charge(vehicle_id):
+    if debug:
+      print '{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id))
+  elif (request.get_battery_level(vehicle_id) < min_battery_level):
+    if debug:
+      print '{:>18}: not ready but should be charging (level= {}%)!'.format(
+        'charging state', request.get_battery_level(vehicle_id))
+    else:
+      print '{} is not ready to charge and is running low (level= {}%)!'.format(
+        name, request.get_battery_level(vehicle_id))
+  else:
+    if debug:
+      print '{:>18}: not ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id))
+
+
+# Check vehicle Sentry Mode setting and activate or deactivate it as appropriate
+#
+def CheckSentryMode(request, vehicle_id, name, home, debug):
+  if home:
+    if request.is_vehicle_sentry_mode_active(vehicle_id):
+      if debug:
+        print '{:>18}: car is home, but Sentry Mode is active'.format('sentry mode')
+      else:
+        print '{} is home, but Sentry Mode is active!'.format(name)
+        
+      if request.set_sentry_mode_off(vehicle_id):
+        if debug:
+          print '{:>18}: turned off'.format('sentry mode')
+        else:
+          print '{} Sentry Mode turned off'.format(name)
+  else:
+    if request.is_vehicle_parked(vehicle_id):
+      if not request.is_vehicle_sentry_mode_active(vehicle_id):
+        if debug:
+          print '{:>18}: car is parked away from home, but Sentry Mode is not active'.format('sentry mode')
+        else:
+          print '{} is parked away from home, but Sentry Mode is not active!'.format(name)
+          
+        if request.set_sentry_mode_on(vehicle_id):
+          if debug:
+            print '{:>18}: activated'.format('sentry mode')
+          else:
+            print '{} Sentry Mode activated'.format(name)
+    
 
 # Is the cat at (near) home?
 #
@@ -210,60 +287,20 @@ def main():
         ReportSecure(request, counter, name, options.debug)
         
         if IsHome(request, counter, options.home, options.debug):
-          if request.get_charging_limit(counter) != options.charging_limit:
-            if options.debug:
-              print '{:>18}: set to {}% instead of {}%'.format(
-                'charging limit', request.get_charging_limit(counter), options.charging_limit)
-            else:
-              print '{} charging limit set to {}% instead of {}%'.format(
-                name, request.get_charging_limit(counter), options.charging_limit)
-    
-            if request.is_charging(counter):
-              if options.debug:
-                print '{:>18}: kept as is since the car is charging'.format('charging limit')
-              else:
-                print '{} kept as is since the car is charging'.format(name)
-            else:
-              if request.set_charging_limit(counter, options.charging_limit):
-                if options.debug:
-                  print '{:>18}: reset to {}%'.format('charging limit', options.charging_limit)
-                else:
-                  print '{} charging limit reset to {}%'.format(name, options.charging_limit)
-              else:
-                if options.debug:
-                  print '{:>18}: failed reset!'.format('charging limit')
-                else:
-                  print '{} failed charging limit reset!'.format(name)
-          else:
-            if options.debug:
-              print '{:>18}: already set to {}'.format(
-                'charging limit', options.charging_limit)
-    
-          if request.is_ready_to_charge(counter):
-            if options.debug:
-              print '{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(counter))
-          elif (request.get_battery_level(counter) < options.min_battery_level):
-            if options.debug:
-              print '{:>18}: not ready but should be charging (level= {}%)!'.format(
-                'charging state', request.get_battery_level(counter))
-            else:
-              print '{} is not ready to charge and is running low (level= {}%)!'.format(
-                name, request.get_battery_level(counter))
-          else:
-            if options.debug:
-              print '{:>18}: not ready ({}%)'.format('charging state', request.get_battery_level(counter))
+          CheckChargingLimit(request, counter, name, options.charging_limit, options.debug)
+          CheckChargeLevel(request, counter, name, options.min_battery_level, options.debug)
+          CheckSentryMode(request, counter, name, True, options.debug)
+        else:
+          CheckSentryMode(request, counter, name, False, options.debug)
   
   
         if options.debug:
           print
-          print json.dumps(request.get_vehicle_state(counter),
-            sort_keys=True, indent=4, separators=(',', ': '))
+          print json.dumps(request.get_vehicle_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
           print
-          print json.dumps(request.get_charge_state(counter),
-            sort_keys=True, indent=4, separators=(',', ': '))
+          print json.dumps(request.get_charge_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
           print
-          print json.dumps(request.get_drive_state(counter),
-            sort_keys=True, indent=4, separators=(',', ': '))
+          print json.dumps(request.get_drive_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
           print
           
           

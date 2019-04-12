@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.13'
+VERSION= '0.1.14'
 MAX_ATTEMPTS= 10
 
 # API request building blocks
@@ -70,11 +70,14 @@ KEY_STATE_VEHICLE_DOOR_TRUNK_FRONT= 'ft'
 KEY_STATE_VEHICLE_DOOR_TRUNK_REAR= 'rt'
 KEY_STATE_VEHICLE_LOCKED= 'locked'
 KEY_STATE_VEHICLE_HOMELINK= 'homelink_nearby'
+KEY_STATE_VEHICLE_SENTRY= 'sentry_mode'
 
 KEY_STATE_CHARGE_LEVEL= 'battery_level'
 KEY_STATE_CHARGE_STATE= 'charging_state'
 KEY_STATE_CHARGE_PENDING= 'scheduled_charging_pending'
 KEY_STATE_CHARGE_LIMIT= 'charge_limit_soc'
+
+KEY_STATE_DRIVE_SHIFT= 'shift_state'
 
 
 VALUE_STATE_CHARGE_CHARGING_READY= ['Connected', 'Stopped']
@@ -83,6 +86,7 @@ VALUE_STATE_CHARGE_BATTERY_LEVEL= 'battery_level'
 VALUE_STATE_ONLINE_ASLEEP= 'asleep'
 VALUE_STATE_ONLINE_ONLINE= 'online'
 VALUE_STATE_ONLINE_OFFLINE= 'offline'
+VALUE_STATE_PARKED= 'P'
 VALUE_STATE_UNKNOWN= 'unknown'
 
 
@@ -333,6 +337,11 @@ class TeslaRequest:
             self.get_vehicle_name(vehicle_index), response.status_code))
     else:
       return attempt
+
+
+  # Expire indicated state cache
+  def __expire_cache(self, vehicle_index, state_type):
+    self.cache[vehicle_index][state_type][KEY_CACHE_EXPIRATION]= 0
               
 
   # Formulate and return stored token parameters
@@ -496,7 +505,7 @@ class TeslaRequest:
       raise error
 
 
-  # Return a boolean indicating the locked state for the specified vehicle
+  # Return a boolean indicating proximity to a programmed HomeLink location ("unknown" string for absent indicator)
   def is_vehicle_near_homelink(self, vehicle_index):
     try:
       state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
@@ -508,6 +517,38 @@ class TeslaRequest:
     except Exception as error:
       if self.debug:
         print 'Could not obtain HomeLink state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index))
+      raise error
+
+
+  # Return a boolean indicating Sentry Mode activation state ("unknown" string for absent indicator)
+  def is_vehicle_sentry_mode_active(self, vehicle_index):
+    try:
+      state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+      
+      if (KEY_STATE_VEHICLE_SENTRY in state):
+        return state[KEY_STATE_VEHICLE_SENTRY]
+      else:
+        return VALUE_STATE_UNKNOWN
+    except Exception as error:
+      if self.debug:
+        print 'Could not obtain Sentry Mode state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index))
+      raise error
+
+
+  # Return a boolean indicating the parked state for the specified vehicle
+  def is_vehicle_parked(self, vehicle_index):
+    try:
+      state= self.__get_state(vehicle_index, REQUEST_DATA_STATE_DRIVE)
+      
+      if (KEY_STATE_DRIVE_SHIFT in state):
+        return (state[KEY_STATE_DRIVE_SHIFT] == VALUE_STATE_PARKED)
+      else:
+        return False
+    except Exception as error:
+      if self.debug:
+        print 'Could not obtain parked state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index))
       raise error
 
@@ -575,17 +616,33 @@ class TeslaRequest:
   # Issue a command to the specified vehicle to set its charging limit
   def set_charging_limit(self, vehicle_index, limit):
     payload= {'percent' : limit}
-
+    self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_CHARGE)
     return self.issue_command(vehicle_index, 'set_charge_limit', payload)
 
 
   # Issue a command to the specified vehicle to set maximum range charging limit
   def set_charging_limit_max(self, vehicle_index):
     payload= {}
+    self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_CHARGE)
     return self.issue_command(vehicle_index, 'charge_max_range', payload)
 
 
   # Issue a command to the specified vehicle to set standard charging limit
   def set_charging_limit_standard(self, vehicle_index):
     payload= {}
+    self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_CHARGE)
     return self.issue_command(vehicle_index, 'charge_standard', payload)
+
+
+  # Issue a command to the specified vehicle to set its charging limit
+  def set_sentry_mode_on(self, vehicle_index):
+    payload= {'on' : True}
+    self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+    return self.issue_command(vehicle_index, 'set_sentry_mode', payload)
+
+
+  # Issue a command to the specified vehicle to set its charging limit
+  def set_sentry_mode_off(self, vehicle_index):
+    payload= {'on' : False}
+    self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
+    return self.issue_command(vehicle_index, 'set_sentry_mode', payload)
