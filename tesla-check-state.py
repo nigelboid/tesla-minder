@@ -17,12 +17,12 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.10'
+VERSION= '0.0.11'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
 
-MAXIMUM_NEAR_DISTANCE= 10   # meters
+MAXIMUM_NEAR_DISTANCE= 15   # meters
 
 
 #
@@ -314,6 +314,9 @@ def main():
         elif not options.quiet:
           print 'Could not access vehicle named "{}" (status is {})'.format(name,
             request.get_vehicle_online_state(counter))
+          print error.args[0]
+          for counter in xrange(1, len(error.args)):
+            print '\t' + str(error.args[counter])
           
         # skip to the next vehicle
         continue

@@ -10,8 +10,8 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.14'
-MAX_ATTEMPTS= 10
+VERSION= '0.1.15'
+MAX_ATTEMPTS= 20
 
 # API request building blocks
 API_VERSION= 'v1'
@@ -250,9 +250,6 @@ class TeslaRequest:
 
   # Obtain and cache indicated state of the specified vehicle
   def __cache_state(self, vehicle_index, state_type):
-    #if self.get_vehicle_online_state(vehicle_index) != VALUE_STATE_ONLINE_ONLINE:
-    #  self.__wake_up(vehicle_index)
-    
     attempts= self.__wake_up(vehicle_index)
       
     if self.get_vehicle_online_state(vehicle_index) == VALUE_STATE_ONLINE_ONLINE:
@@ -313,9 +310,9 @@ class TeslaRequest:
       + '/' + COMMAND_WAKE_UP
       
     awake= False
-    attempt= 0
-    while attempt < MAX_ATTEMPTS:
-      attempt+= 1
+    attempts= 0
+    while attempts < MAX_ATTEMPTS:
+      attempts+= 1
       response= requests.post(request, headers= headers)
       time.sleep(ATTEMPT_RETRY_DELAY)
     
@@ -328,15 +325,17 @@ class TeslaRequest:
     if not awake:
       if self.debug:
         raise Exception('Could not wake up vehicle'
-          + ' named "{}" (status code {})'.format(
-            self.get_vehicle_name(vehicle_index), response.status_code),
+          + ' named "{}" (response code {}, status is {})'.format(
+            self.get_vehicle_name(vehicle_index), response.status_code,
+            response.json()[STATUS_RESPONSE][KEY_VEHICLE_ONLINE_STATE]),
           self, request, headers)
       else:
         raise Exception('Could not wake up vehicle'
-          + ' named "{}" (status code {})'.format(
-            self.get_vehicle_name(vehicle_index), response.status_code))
+          + ' named "{}" (response code {}, status is {})'.format(
+            self.get_vehicle_name(vehicle_index), response.status_code,
+            response.json()[STATUS_RESPONSE][KEY_VEHICLE_ONLINE_STATE]))
     else:
-      return attempt
+      return attempts
 
 
   # Expire indicated state cache
@@ -575,7 +574,7 @@ class TeslaRequest:
   def is_charging(self, vehicle_index):
     try:
       return (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
-          == VALUE_STATE_CHARGE_CHARGING_NOW)
+          in VALUE_STATE_CHARGE_CHARGING_NOW)
     except Exception as error:
       if self.debug:
         print 'Could not obtain charging state for vehicle named "{}"'.format(
