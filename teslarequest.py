@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.16'
+VERSION= '0.1.15'
 MAX_ATTEMPTS= 20
 
 # API request building blocks

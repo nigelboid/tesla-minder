@@ -10,13 +10,14 @@ import json
 import datetime
 import geopy.distance
 from teslarequest import TeslaRequest
+#from operator import itemgetter
 
 
 #
 # Define some global constants
 #
 
-VERSION= '0.0.13'
+VERSION= '0.0.11'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
@@ -54,9 +55,6 @@ def GetArguments():
     nargs=1, dest='home_longitude', type=float, required=False, action='store',
     help='Home longitude coordinate')
 
-  argumentParser.add_argument('-i', '--ignore', '--ignore-car',
-    dest='ignore', required=False, action='append',
-    help='A list of car names to skip')
 
   argumentParser.add_argument('-d', '--debug', dest='debug', required=False,
     action='store_true', default=False, help='Turn on verbose diagnostics')
@@ -78,9 +76,6 @@ def NormalizeArguments(options):
 
   # convert lists of single strings into strings
   options.token_file = str(options.token_file.pop())
-  
-  if (options.ignore == None):
-      options.ignore= []
   
   if (options.home_latitude == None or options.home_longitude == None):
     options.home= 'unknown'
@@ -279,13 +274,6 @@ def main():
     for counter in xrange(0, vehicle_count):
       try:
         name= request.get_vehicle_name(counter)
-        if (name in options.ignore):
-          if options.debug:
-            print
-            print
-            print '{:>14}: {}'.format(name, "Skipping...")
-          continue
-        
         vehicle_id= request.get_vehicle_id(counter)
         if options.debug:
           print
