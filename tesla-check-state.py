@@ -16,7 +16,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.13'
+VERSION= '0.0.14'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
@@ -135,7 +135,7 @@ def CheckChargingLimit(request, vehicle_id, name, charging_limit, debug):
       print '{} charging limit set to {}% instead of {}%'.format(
         name, request.get_charging_limit(vehicle_id), charging_limit)
 
-    if request.is_charging(vehicle_id):
+    if request.is_vehicle_charging(vehicle_id):
       if debug:
         print '{:>18}: kept as is since the car is charging'.format('charging limit')
       else:
@@ -159,7 +159,7 @@ def CheckChargingLimit(request, vehicle_id, name, charging_limit, debug):
 # Check vehicle charge level and report it if below threshold
 #
 def CheckChargeLevel(request, vehicle_id, name, min_battery_level, debug):
-  if request.is_ready_to_charge(vehicle_id):
+  if request.is_vehicle_ready_to_charge(vehicle_id):
     if debug:
       print '{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id))
   elif (request.get_battery_level(vehicle_id) < min_battery_level):
@@ -293,7 +293,12 @@ def main():
           print '{:>14}: {}'.format(name, vehicle_id)
   
         state= request.get_vehicle_online_state(counter)
-        if options.debug:
+        if request.is_vehicle_in_service(counter):
+          if options.debug:
+              print '{:>18}: {}'.format('state', "in service")
+          continue
+        else:
+          if options.debug:
             print '{:>18}: {}'.format('state', state)
               
         ReportSecure(request, counter, name, options.debug)

@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.16'
+VERSION= '0.1.17'
 MAX_ATTEMPTS= 20
 
 # API request building blocks
@@ -57,6 +57,7 @@ KEY_VEHICLE_COUNT= 'count'
 KEY_VEHICLE_NAME= 'display_name'
 KEY_VEHICLE_ID= 'id'
 KEY_VEHICLE_ONLINE_STATE= 'state'
+KEY_VEHICLE_INSERVICE_STATE= 'in_service'
 
 KEY_RESPONSE= 'response'
 KEY_RESULT= 'result'
@@ -406,13 +407,23 @@ class TeslaRequest:
       raise error
 
 
-  # Return the ID of the specified vehicle
+  # Return the online state of the specified vehicle
   def get_vehicle_online_state(self, vehicle_index):
     try:
       return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]
     except Exception as error:
       if self.debug:
         print 'Could not access the online state of vehicle #{}'.format(vehicle_index)
+      raise error
+
+
+  # Return the in-service state of the specified vehicle
+  def is_vehicle_in_service(self, vehicle_index):
+    try:
+      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_INSERVICE_STATE]
+    except Exception as error:
+      if self.debug:
+        print 'Could not access the in-service state of vehicle #{}'.format(vehicle_index)
       raise error
 
 
@@ -553,7 +564,7 @@ class TeslaRequest:
 
 
   # Return a boolean indicating charging readiness for the specified vehicle
-  def is_ready_to_charge(self, vehicle_index):
+  def is_vehicle_ready_to_charge(self, vehicle_index):
     try:
       return (
         ((self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
@@ -562,7 +573,7 @@ class TeslaRequest:
         (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_PENDING]
           == True))
           
-        or self.is_charging(vehicle_index))
+        or self.is_vehicle_charging(vehicle_index))
     except Exception as error:
       if self.debug:
         print 'Could not obtain charging state for vehicle named "{}"'.format(
@@ -571,7 +582,7 @@ class TeslaRequest:
 
 
   # Return a boolean indicating charging readiness for the specified vehicle
-  def is_charging(self, vehicle_index):
+  def is_vehicle_charging(self, vehicle_index):
     try:
       return (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
           in VALUE_STATE_CHARGE_CHARGING_NOW)
