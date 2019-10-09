@@ -14,7 +14,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.3'
+VERSION= '0.0.4'
 
 KEY_EMAIL= 'e-mail'
 KEY_PASSWORD= 'password'
@@ -74,8 +74,8 @@ def main():
       secret+= line
     secret= json.loads(secret)
   except:
-    print 'Failed to provide properly formatted (JSON) login information as input.'
-    print 'Treminating...'
+    print('Failed to provide properly formatted (JSON) login information as input.')
+    print('Treminating...')
   else:
     try:
       # instantiate our Tesla API and initialize from command line arguments
@@ -84,28 +84,27 @@ def main():
 
       # figure out what we have
       if options.debug:
-        print
-        print '{:>18}: {}'.format('URL', request.get_url())
+        print()
+        print('{:>18}: {}'.format('URL', request.get_url()))
 
       # write it out to our designated output file (or STDOUT if none)
       if options.output:
         with open(options.output, 'w') as output_file:
           json.dump(request.get_token(), output_file)
       else:
-        print json.dumps(request.get_token(), sort_keys=True, indent=4,
-          separators=(',', ': '))
+        print(json.dumps(request.get_token(), sort_keys=True, indent=4, separators=(',', ': ')))
 
     except Exception as error:
-      print type(error)
-      print error.args[0]
-      for counter in xrange(1, len(error.args)):
-        print '\t' + str(error.args[counter])
+      print(type(error))
+      print(error.args[0])
+      for counter in range(1, len(error.args)):
+        print('\t' + str(error.args[counter]))
 
     else:
       if options.debug:
-        print
-        print 'All done!'
-        print
+        print()
+        print('All done!')
+        print()
 
 
 #

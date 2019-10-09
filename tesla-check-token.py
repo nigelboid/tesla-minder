@@ -15,7 +15,7 @@ import datetime
 # Define some global constants
 #
 
-VERSION= '0.0.2'
+VERSION= '0.0.3'
 
 KEY_TOKEN= 'access_token'
 KEY_TOKEN_CREATION= 'created_at'
@@ -77,11 +77,11 @@ def GetToken(options):
   time_remaining= token_expiration - datetime.datetime.now()
 
   if options.debug:
-    print '{:>23}: {}'.format('Token', token[KEY_TOKEN])
-    print '{:>23}: {}'.format('Token type', token[KEY_TOKEN_TYPE])
-    print '{:>23}: {}'.format('Token created', token_creation)
-    print '{:>23}: {}'.format('Token expires', token_expiration)
-    print '{:>23}: {}'.format('Token life remaining', time_remaining)
+    print('{:>23}: {}'.format('Token', token[KEY_TOKEN]))
+    print('{:>23}: {}'.format('Token type', token[KEY_TOKEN_TYPE]))
+    print('{:>23}: {}'.format('Token created', token_creation))
+    print('{:>23}: {}'.format('Token expires', token_expiration))
+    print('{:>23}: {}'.format('Token life remaining', time_remaining))
 
   return time_remaining.days
 
@@ -98,22 +98,21 @@ def main():
     # figure out what we have
     if (days > options.min_expiration_days):
       if options.debug:
-        print
-        print 'Token expires in {} days ({} days threshold).'.format(
-          days, options.min_expiration_days)
+        print()
+        print('Token expires in {} days ({} days threshold).'.format(days, options.min_expiration_days))
     else:
-        print 'Time to refresh the token ({} days remaining)!'.format(days)
+        print('Time to refresh the token ({} days remaining)!'.format(days))
 
 
   except Exception as error:
-    print type(error)
-    print error.args[0]
-    for counter in xrange(1, len(error.args)):
-      print '\t' + str(error.args[counter])
+    print(type(error))
+    print(error.args[0])
+    for counter in range(1, len(error.args)):
+      print('\t' + str(error.args[counter]))
 
   else:
     if options.debug:
-      print 'All done!'
+      print('All done!')
 
 
 #

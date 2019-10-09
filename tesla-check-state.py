@@ -16,12 +16,12 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.14'
+VERSION= '0.0.15'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
 
-MAXIMUM_NEAR_DISTANCE= 15   # meters
+MAXIMUM_NEAR_DISTANCE= 25   # meters
 
 
 #
@@ -105,23 +105,21 @@ def ReportSecure(request, vehicle_id, name, debug):
   open_doors= request.get_vehicle_open_doors_and_trunks(vehicle_id)
   if (len(open_doors) > 0):
     if debug:
-      print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
-        open_doors)
+      print('{:>18}: {}'.format('open door' + PluralS(len(open_doors)), open_doors))
     else:
-      print 'Open door{}! {}: {}'.format(PluralS(len(open_doors)), name, open_doors)
+      print('Open door{}! {}: {}'.format(PluralS(len(open_doors)), name, open_doors))
   else:
     if debug:
-      print '{:>18}: {}'.format('open door' + PluralS(len(open_doors)),
-        'all doors closed')
+      print('{:>18}: {}'.format('open door' + PluralS(len(open_doors)), 'all doors closed'))
 
   if request.is_vehicle_locked(vehicle_id):
     if debug:
-      print '{:>18}: locked'.format('lock state')
+      print('{:>18}: locked'.format('lock state'))
   else:
     if debug:
-      print '{:>18}: unlocked'.format('lock state')
+      print('{:>18}: unlocked'.format('lock state'))
     else:
-      print '{} is unlocked!'.format(name)
+      print('{} is unlocked!'.format(name))
 
 
 # Check vehicle charging limit and reset it, if necessary and appropriate
@@ -129,31 +127,31 @@ def ReportSecure(request, vehicle_id, name, debug):
 def CheckChargingLimit(request, vehicle_id, name, charging_limit, debug):
   if request.get_charging_limit(vehicle_id) != charging_limit:
     if debug:
-      print '{:>18}: set to {}% instead of {}%'.format(
-        'charging limit', request.get_charging_limit(vehicle_id), charging_limit)
+      print('{:>18}: set to {}% instead of {}%'.format(
+        'charging limit', request.get_charging_limit(vehicle_id), charging_limit))
     else:
-      print '{} charging limit set to {}% instead of {}%'.format(
-        name, request.get_charging_limit(vehicle_id), charging_limit)
+      print('{} charging limit set to {}% instead of {}%'.format(
+        name, request.get_charging_limit(vehicle_id), charging_limit))
 
     if request.is_vehicle_charging(vehicle_id):
       if debug:
-        print '{:>18}: kept as is since the car is charging'.format('charging limit')
+        print('{:>18}: kept as is since the car is charging'.format('charging limit'))
       else:
-        print '{} kept as is since the car is charging'.format(name)
+        print('{} kept as is since the car is charging'.format(name))
     else:
       if request.set_charging_limit(vehicle_id, charging_limit):
         if debug:
-          print '{:>18}: reset to {}%'.format('charging limit', charging_limit)
+          print('{:>18}: reset to {}%'.format('charging limit', charging_limit))
         else:
-          print '{} charging limit reset to {}%'.format(name, charging_limit)
+          print('{} charging limit reset to {}%'.format(name, charging_limit))
       else:
         if debug:
-          print '{:>18}: failed reset!'.format('charging limit')
+          print('{:>18}: failed reset!'.format('charging limit'))
         else:
-          print '{} failed charging limit reset!'.format(name)
+          print('{} failed charging limit reset!'.format(name))
   else:
     if debug:
-      print '{:>18}: already set to {}'.format('charging limit', charging_limit)
+      print('{:>18}: already set to {}'.format('charging limit', charging_limit))
 
 
 # Check vehicle charge level and report it if below threshold
@@ -161,17 +159,17 @@ def CheckChargingLimit(request, vehicle_id, name, charging_limit, debug):
 def CheckChargeLevel(request, vehicle_id, name, min_battery_level, debug):
   if request.is_vehicle_ready_to_charge(vehicle_id):
     if debug:
-      print '{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id))
+      print('{:>18}: ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id)))
   elif (request.get_battery_level(vehicle_id) < min_battery_level):
     if debug:
-      print '{:>18}: not ready but should be charging (level= {}%)!'.format(
-        'charging state', request.get_battery_level(vehicle_id))
+      print('{:>18}: not ready but should be charging (level= {}%)!'.format(
+        'charging state', request.get_battery_level(vehicle_id)))
     else:
-      print '{} is not ready to charge and is running low (level= {}%)!'.format(
-        name, request.get_battery_level(vehicle_id))
+      print('{} is not ready to charge and is running low (level= {}%)!'.format(
+        name, request.get_battery_level(vehicle_id)))
   else:
     if debug:
-      print '{:>18}: not ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id))
+      print('{:>18}: not ready ({}%)'.format('charging state', request.get_battery_level(vehicle_id)))
 
 
 # Check vehicle Sentry Mode setting and activate or deactivate it as appropriate
@@ -180,28 +178,28 @@ def CheckSentryMode(request, vehicle_id, name, home, debug):
   if home:
     if request.is_vehicle_sentry_mode_active(vehicle_id):
       if debug:
-        print '{:>18}: car is home, but Sentry Mode is active'.format('sentry mode')
+        print('{:>18}: car is home, but Sentry Mode is active'.format('sentry mode'))
       else:
-        print '{} is home, but Sentry Mode is active!'.format(name)
+        print('{} is home, but Sentry Mode is active!'.format(name))
         
       if request.set_sentry_mode_off(vehicle_id):
         if debug:
-          print '{:>18}: turned off'.format('sentry mode')
+          print('{:>18}: turned off'.format('sentry mode'))
         else:
-          print '{} Sentry Mode turned off'.format(name)
+          print('{} Sentry Mode turned off'.format(name))
   else:
     if request.is_vehicle_parked(vehicle_id):
       if not request.is_vehicle_sentry_mode_active(vehicle_id):
         if debug:
-          print '{:>18}: car is parked away from home, but Sentry Mode is not active'.format('sentry mode')
+          print('{:>18}: car is parked away from home, but Sentry Mode is not active'.format('sentry mode'))
         else:
-          print '{} is parked away from home, but Sentry Mode is not active!'.format(name)
+          print('{} is parked away from home, but Sentry Mode is not active!'.format(name))
           
         if request.set_sentry_mode_on(vehicle_id):
           if debug:
-            print '{:>18}: activated'.format('sentry mode')
+            print('{:>18}: activated'.format('sentry mode'))
           else:
-            print '{} Sentry Mode activated'.format(name)
+            print('{} Sentry Mode activated'.format(name))
     
 
 # Is the cat at (near) home?
@@ -209,26 +207,26 @@ def CheckSentryMode(request, vehicle_id, name, home, debug):
 def IsHome(request, vehicle_id, home, debug):
   if (isinstance(home, str)):
     if debug:
-      print '{:>18}: {}'.format('home', home)
+      print('{:>18}: {}'.format('home', home))
       
     return IsNearHomeLink(request, vehicle_id, debug)
     
   else:
     if debug:
-      print '{:>18}: home location supplied {}'.format('home', home)
+      print('{:>18}: home location supplied {}'.format('home', home))
     
     distance= geopy.distance.distance(home, request.get_vehicle_location(vehicle_id)).m
     if (distance < MAXIMUM_NEAR_DISTANCE):
       if debug:
-        print '{:>18}: home'.format('location')
-        print '{:>18}: {} meters'.format('distance', round(distance, 2))
+        print('{:>18}: home'.format('location'))
+        print('{:>18}: {} meters'.format('distance', round(distance, 2)))
         
       return True
     else:
       if debug:
-        print '{:>18}: not at home'.format('location')
-        print '{:>18}: {} miles'.format('distance',
-          round(geopy.distance.distance(home, request.get_vehicle_location(vehicle_id)).miles, 3))
+        print('{:>18}: not at home'.format('location'))
+        print('{:>18}: {} miles'.format('distance',
+          round(geopy.distance.distance(home, request.get_vehicle_location(vehicle_id)).miles, 3)))
         
       return False
     
@@ -241,14 +239,14 @@ def IsNearHomeLink(request, vehicle_id, debug):
   if (isinstance(isHome, bool)):
     if debug:
       if isHome:
-        print '{:>18}: home'.format('location')
+        print('{:>18}: home'.format('location'))
       else:
-        print '{:>18}: not at home'.format('location')
+        print('{:>18}: not at home'.format('location'))
       
     return isHome
   else:
     if debug:
-      print '{:>18}: {}'.format('location', isHome)
+      print('{:>18}: {}'.format('location', isHome))
     return False
     
 
@@ -273,33 +271,33 @@ def main():
     # figure out what we have
     vehicle_count= request.get_vehicle_count()
     if options.debug:
-      print
-      print '{:>14}: {}'.format('Count', vehicle_count)
+      print()
+      print('{:>14}: {}'.format('Count', vehicle_count))
 
-    for counter in xrange(0, vehicle_count):
+    for counter in range(0, vehicle_count):
       try:
         name= request.get_vehicle_name(counter)
         if (name in options.ignore):
           if options.debug:
-            print
-            print
-            print '{:>14}: {}'.format(name, "Skipping...")
+            print()
+            print()
+            print('{:>14}: {}'.format(name, "Skipping..."))
           continue
         
         vehicle_id= request.get_vehicle_id(counter)
         if options.debug:
-          print
-          print
-          print '{:>14}: {}'.format(name, vehicle_id)
+          print()
+          print()
+          print('{:>14}: {}'.format(name, vehicle_id))
   
         state= request.get_vehicle_online_state(counter)
         if request.is_vehicle_in_service(counter):
           if options.debug:
-              print '{:>18}: {}'.format('state', "in service")
+              print('{:>18}: {}'.format('state', "in service"))
           continue
         else:
           if options.debug:
-            print '{:>18}: {}'.format('state', state)
+            print('{:>18}: {}'.format('state', state))
               
         ReportSecure(request, counter, name, options.debug)
         
@@ -312,44 +310,44 @@ def main():
   
   
         if options.debug:
-          print
-          print json.dumps(request.get_vehicle_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
-          print
-          print json.dumps(request.get_charge_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
-          print
-          print json.dumps(request.get_drive_state(counter), sort_keys=True, indent=4, separators=(',', ': '))
-          print
+          print()
+          print(json.dumps(request.get_vehicle_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
+          print()
+          print(json.dumps(request.get_charge_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
+          print()
+          print(json.dumps(request.get_drive_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
+          print()
           
           
       except Exception as error:
         # problems accessing a vehicle
         if options.debug:
-          print type(error)
-          print error.args[0]
-          for counter in xrange(1, len(error.args)):
-            print '\t' + str(error.args[counter])
+          print(type(error))
+          print(error.args[0])
+          for counter in range(1, len(error.args)):
+            print('\t' + str(error.args[counter]))
         elif not options.quiet:
-          print 'Could not access vehicle named "{}" (status is {})'.format(name,
-            request.get_vehicle_online_state(counter))
-          print error.args[0]
-          for counter in xrange(1, len(error.args)):
-            print '\t' + str(error.args[counter])
+          print('Could not access vehicle named "{}" (status is {})'.format(name,
+            request.get_vehicle_online_state(counter)))
+          print(error.args[0])
+          for counter in range(1, len(error.args)):
+            print('\t' + str(error.args[counter]))
           
         # skip to the next vehicle
         continue
         
 
   except Exception as error:
-    print type(error)
-    print error.args[0]
-    for counter in xrange(1, len(error.args)):
-      print '\t' + str(error.args[counter])
+    print(type(error))
+    print(error.args[0])
+    for counter in range(1, len(error.args)):
+      print('\t' + str(error.args[counter]))
 
   else:
     if options.debug:
-      print
-      print 'All done!'
-      print
+      print()
+      print('All done!')
+      print()
 
 
 #

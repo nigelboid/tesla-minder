@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.17'
+VERSION= '0.1.18'
 MAX_ATTEMPTS= 20
 
 # API request building blocks
@@ -191,8 +191,8 @@ class TeslaRequest:
       client_secret= owner_api[API_VERSION][KEY_API_SECRET]
     except Exception as error:
       if self.debug:
-        print 'Failed to obtain expected Owner API parameters'
-        print json.dumps(owner_api, sort_keys=True, indent=4, separators=(',', ': '))
+        print('Failed to obtain expected Owner API parameters')
+        print(json.dumps(owner_api, sort_keys=True, indent=4, separators=(',', ': ')))
       raise error
 
     try:
@@ -206,7 +206,7 @@ class TeslaRequest:
       }
     except Exception as error:
       if self.debug:
-        print 'Failed to formulate token request'
+        print('Failed to formulate token request')
       raise error
 
     response= requests.post(request, json= payload)
@@ -298,8 +298,8 @@ class TeslaRequest:
 
     except Exception as error:
       if self.debug:
-        print 'Could not obtain state of vehicle named "{}" from cache'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain state of vehicle named "{}" from cache'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -350,7 +350,7 @@ class TeslaRequest:
       return self.token
     except Exception as error:
       if self.debug:
-        print 'No token parameters set!'
+        print('No token parameters set!')
       raise error
 
 
@@ -360,7 +360,7 @@ class TeslaRequest:
       return self.token[KEY_TOKEN_URL]
     except Exception as error:
       if self.debug:
-        print 'No Owner API URL set!'
+        print('No Owner API URL set!')
       raise error
 
 
@@ -373,7 +373,7 @@ class TeslaRequest:
         }
     except Exception as error:
       if self.debug:
-        print 'Failed to formulate Owner API request headers!'
+        print('Failed to formulate Owner API request headers!')
       raise error
 
 
@@ -383,7 +383,7 @@ class TeslaRequest:
       return self.vehicles[KEY_VEHICLE_COUNT]
     except Exception as error:
       if self.debug:
-        print 'No vehicles stored!'
+        print('No vehicles stored!')
       raise error
 
 
@@ -393,7 +393,7 @@ class TeslaRequest:
       return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_NAME]
     except Exception as error:
       if self.debug:
-        print 'Could not access the name of vehicle #{}'.format(vehicle_index)
+        print('Could not access the name of vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -403,7 +403,7 @@ class TeslaRequest:
       return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ID]
     except Exception as error:
       if self.debug:
-        print 'Could not access the ID of vehicle #{}'.format(vehicle_index)
+        print('Could not access the ID of vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -413,7 +413,7 @@ class TeslaRequest:
       return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]
     except Exception as error:
       if self.debug:
-        print 'Could not access the online state of vehicle #{}'.format(vehicle_index)
+        print('Could not access the online state of vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -423,7 +423,7 @@ class TeslaRequest:
       return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_INSERVICE_STATE]
     except Exception as error:
       if self.debug:
-        print 'Could not access the in-service state of vehicle #{}'.format(vehicle_index)
+        print('Could not access the in-service state of vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -433,7 +433,7 @@ class TeslaRequest:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
     except Exception as error:
       if self.debug:
-        print 'Could not access general state for vehicle #{}'.format(vehicle_index)
+        print('Could not access general state for vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -443,7 +443,7 @@ class TeslaRequest:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_DRIVE)
     except Exception as error:
       if self.debug:
-        print 'Could not access drive state for vehicle #{}'.format(vehicle_index)
+        print('Could not access drive state for vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -453,7 +453,7 @@ class TeslaRequest:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)
     except Exception as error:
       if self.debug:
-        print 'Could not access charge state for vehicle #{}'.format(vehicle_index)
+        print('Could not access charge state for vehicle #{}'.format(vehicle_index))
       raise error
 
 
@@ -484,8 +484,8 @@ class TeslaRequest:
 
     except Exception as error:
       if self.debug:
-        print 'Could not obtain open doors and trunks for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain open doors and trunks for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -498,8 +498,8 @@ class TeslaRequest:
 
     except Exception as error:
       if self.debug:
-        print 'Could not obtain location for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain location for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -510,8 +510,8 @@ class TeslaRequest:
         vehicle_index, REQUEST_DATA_STATE_VEHICLE)[KEY_STATE_VEHICLE_LOCKED]
     except Exception as error:
       if self.debug:
-        print 'Could not obtain locked state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain locked state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -526,8 +526,8 @@ class TeslaRequest:
         return VALUE_STATE_UNKNOWN
     except Exception as error:
       if self.debug:
-        print 'Could not obtain HomeLink state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain HomeLink state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -542,8 +542,8 @@ class TeslaRequest:
         return VALUE_STATE_UNKNOWN
     except Exception as error:
       if self.debug:
-        print 'Could not obtain Sentry Mode state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain Sentry Mode state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -558,8 +558,8 @@ class TeslaRequest:
         return False
     except Exception as error:
       if self.debug:
-        print 'Could not obtain parked state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain parked state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -576,8 +576,8 @@ class TeslaRequest:
         or self.is_vehicle_charging(vehicle_index))
     except Exception as error:
       if self.debug:
-        print 'Could not obtain charging state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain charging state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -588,8 +588,8 @@ class TeslaRequest:
           in VALUE_STATE_CHARGE_CHARGING_NOW)
     except Exception as error:
       if self.debug:
-        print 'Could not obtain charging state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain charging state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
@@ -600,8 +600,8 @@ class TeslaRequest:
         vehicle_index, REQUEST_DATA_STATE_CHARGE)[VALUE_STATE_CHARGE_BATTERY_LEVEL])
     except Exception as error:
       if self.debug:
-        print 'Could not obtain charging state for vehicle named "{}"'.format(
-          self.get_vehicle_name(vehicle_index))
+        print('Could not obtain charging state for vehicle named "{}"'.format(
+          self.get_vehicle_name(vehicle_index)))
       raise error
 
 
