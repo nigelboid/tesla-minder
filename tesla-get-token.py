@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 #
@@ -14,7 +14,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.4'
+VERSION= '0.0.5'
 
 KEY_EMAIL= 'e-mail'
 KEY_PASSWORD= 'password'
@@ -84,7 +84,7 @@ def main():
 
       # figure out what we have
       if options.debug:
-        print()
+        print('')
         print('{:>18}: {}'.format('URL', request.get_url()))
 
       # write it out to our designated output file (or STDOUT if none)
@@ -102,9 +102,9 @@ def main():
 
     else:
       if options.debug:
-        print()
+        print('')
         print('All done!')
-        print()
+        print('')
 
 
 #

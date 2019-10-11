@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 #
@@ -16,7 +16,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.15'
+VERSION= '0.0.16'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
@@ -271,7 +271,7 @@ def main():
     # figure out what we have
     vehicle_count= request.get_vehicle_count()
     if options.debug:
-      print()
+      print('')
       print('{:>14}: {}'.format('Count', vehicle_count))
 
     for counter in range(0, vehicle_count):
@@ -279,15 +279,15 @@ def main():
         name= request.get_vehicle_name(counter)
         if (name in options.ignore):
           if options.debug:
-            print()
-            print()
+            print('')
+            print('')
             print('{:>14}: {}'.format(name, "Skipping..."))
           continue
         
         vehicle_id= request.get_vehicle_id(counter)
         if options.debug:
-          print()
-          print()
+          print('')
+          print('')
           print('{:>14}: {}'.format(name, vehicle_id))
   
         state= request.get_vehicle_online_state(counter)
@@ -310,13 +310,13 @@ def main():
   
   
         if options.debug:
-          print()
+          print('')
           print(json.dumps(request.get_vehicle_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
-          print()
+          print('')
           print(json.dumps(request.get_charge_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
-          print()
+          print('')
           print(json.dumps(request.get_drive_state(counter), sort_keys=True, indent=4, separators=(',', ': ')))
-          print()
+          print('')
           
           
       except Exception as error:
@@ -345,9 +345,9 @@ def main():
 
   else:
     if options.debug:
-      print()
+      print('')
       print('All done!')
-      print()
+      print('')
 
 
 #

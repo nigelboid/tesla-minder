@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 
 #
@@ -15,7 +15,7 @@ import datetime
 # Define some global constants
 #
 
-VERSION= '0.0.3'
+VERSION= '0.0.4'
 
 KEY_TOKEN= 'access_token'
 KEY_TOKEN_CREATION= 'created_at'
@@ -98,7 +98,7 @@ def main():
     # figure out what we have
     if (days > options.min_expiration_days):
       if options.debug:
-        print()
+        print('')
         print('Token expires in {} days ({} days threshold).'.format(days, options.min_expiration_days))
     else:
         print('Time to refresh the token ({} days remaining)!'.format(days))
