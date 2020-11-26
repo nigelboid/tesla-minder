@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.1.18'
+VERSION= '0.2.1'
 MAX_ATTEMPTS= 20
 
 # API request building blocks
@@ -141,72 +141,107 @@ class TeslaRequest:
       self.cache_expiration_limit= arguments.cache_expiration_limit
     else:
       self.cache_expiration_limit= CACHE_EXPIRATION_LIMIT
-
-    # Bootstrap value discovery
-    if self.token:
-      if self.__is_token_valid():
-        self.__cache_vehicles()
-      elif self.e_mail and self.password:
-        self.__cache_token()
-        self.__cache_vehicles()
-      else:
-        self.vehicles= None
-        raise Exception(
-          'Could not validate existing token (no credentials to obtain a new one)!', self)
-    elif self.e_mail and self.password:
-      self.__cache_token()
-      self.__cache_vehicles()
-    else:
-      self.vehicles= None
-      raise Exception(
-        'Could not obtain a token (no credentials to obtain a new one)!', self)
+      
+    self.__cache_token()
+    self.__cache_vehicles()
 
 
   # Obtain Owner API parameters from our special place
   def __get_owner_api_parameters(self):
-    owner_api= requests.get(OWNERAPI_CLIENT_TOKENS_URL)
-
-    if owner_api.status_code == STATUS_CODE_OK:
-      return owner_api.json()
-    else:
-      if self.debug:
-        raise Exception('Could not obtain Owner API parameters (status code {})'.format(owner_api.status_code), self)
-      else:
-        raise Exception('Could not obtain Owner API parameters (status code {})'.format(owner_api.status_code))
-
-
-  # Obtain access token from Tesla
-  def __cache_token(self):
-    owner_api= self.__get_owner_api_parameters()
-
     try:
-      # URL validation code from SethRobertson https://github.com/gglockner/teslajson/pull/12/files
-      prefix='https://'
-      owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
-      if (not owner_url.startswith(prefix) or '/' in owner_url[len(prefix):]
-      or not owner_url.endswith(('.teslamotors.com', '.tesla.com'))):
-        raise IOError('Unexpected token source URL <{}>'.format(owner_url))
-      
-      client_id= owner_api[API_VERSION][KEY_API_ID]
-      client_secret= owner_api[API_VERSION][KEY_API_SECRET]
+      owner_api_response= requests.get(OWNERAPI_CLIENT_TOKENS_URL)
+
+      if owner_api_response.status_code == STATUS_CODE_OK:
+        owner_api= owner_api_response.json()
+        
+        # URL validation code from SethRobertson https://github.com/gglockner/teslajson/pull/12/files
+        prefix='https://'
+        owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
+        if (not owner_url.startswith(prefix) or '/' in owner_url[len(prefix):]
+          or not owner_url.endswith(('.teslamotors.com', '.tesla.com'))):
+            raise IOError('Unexpected token source URL <{}>'.format(owner_url))
+        
+        return owner_api
+      else:
+        if self.debug:
+          raise Exception('Could not obtain Owner API parameters (status code {})'.format(
+            owner_api_response.status_code), self)
+        else:
+          raise Exception('Could not obtain Owner API parameters (status code {})'.format(
+            owner_api_response.status_code))
+            
     except Exception as error:
       if self.debug:
         print('Failed to obtain expected Owner API parameters')
-        print(json.dumps(owner_api, sort_keys=True, indent=4, separators=(',', ': ')))
+        print(owner_api_response)
       raise error
 
+
+  # Validate current access token or obtain and cache a refreshed or a new one
+  def __cache_token(self):
+    if self.token:
+      if not self.__is_token_valid():
+        self.__refresh_token()
+        
+    else:
+      if self.e_mail and self.password:
+        self.__get_token()
+      else:
+        raise Exception('Could not obtain a token (no credentials to obtain a new one)!', self)
+
+
+  # Refresh access token
+  def __refresh_token(self):
     try:
+      owner_api= self.__get_owner_api_parameters()
+      
+      owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
+      request= owner_url + REQUEST_TOKEN
+      payload= {
+        'grant_type' : 'refresh_token',
+  			'client_id' : owner_api[API_VERSION][KEY_API_ID],
+  			'client_secret' : owner_api[API_VERSION][KEY_API_SECRET],
+  			'refresh_token' : self.token[KEY_TOKEN_REFRESH],
+      }
+    except Exception as error:
+      if self.debug:
+        print('Failed to formulate refresh token request')
+      raise error
+
+    response= requests.post(request, json= payload)
+
+    if response.status_code == STATUS_CODE_OK:
+      self.token= response.json()
+      self.token[KEY_TOKEN_URL]= owner_url
+      return True
+    else:
+      if self.debug:
+        raise Exception('Failed to obtain token (status code {})'.format(
+          response.status_code), self, request, payload)
+      else:
+        raise Exception('Failed to obtain token (status code {})'.format(
+          response.status_code))
+
+
+
+
+  # Obtain new access token
+  def __get_token(self):
+    try:
+      owner_api= self.__get_owner_api_parameters()
+      
+      owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
       request= owner_url + REQUEST_TOKEN
       payload= {
         'grant_type' : 'password',
-  			'client_id' : client_id,
-  			'client_secret' : client_secret,
+  			'client_id' : owner_api[API_VERSION][KEY_API_ID],
+  			'client_secret' : owner_api[API_VERSION][KEY_API_SECRET],
   			'email' : self.e_mail,
   			'password' : self.password,
       }
     except Exception as error:
       if self.debug:
-        print('Failed to formulate token request')
+        print('Failed to formulate new token request')
       raise error
 
     response= requests.post(request, json= payload)
@@ -656,3 +691,8 @@ class TeslaRequest:
     payload= {'on' : False}
     self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
     return self.issue_command(vehicle_index, 'set_sentry_mode', payload)
+
+
+  # Force refresh of our access token
+  def force_token_refresh(self):
+    self.__refresh_token()

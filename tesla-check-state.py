@@ -7,7 +7,7 @@
 
 import argparse
 import json
-import datetime
+#import datetime
 import geopy.distance
 from teslarequest import TeslaRequest
 
@@ -16,12 +16,12 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.16'
+VERSION= '0.1.0'
 
 MINIMUM_CHARGING_LEVEL= 50  # percent
 DEFAULT_CHARGING_LIMIT= 80  # percent
 
-MAXIMUM_NEAR_DISTANCE= 25   # meters
+MAXIMUM_NEAR_DISTANCE= 30   # meters
 
 
 #

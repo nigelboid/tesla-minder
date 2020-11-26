@@ -14,7 +14,7 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.0.5'
+VERSION= '0.0.6'
 
 KEY_EMAIL= 'e-mail'
 KEY_PASSWORD= 'password'
@@ -30,7 +30,7 @@ def GetArguments():
   argumentParser= argparse.ArgumentParser()
 
   argumentParser.add_argument('-o', '--output', '--output-file',
-    nargs=1, dest='output', required=False, action='store',
+    dest='output', required=False, action='store',
     help='File to store Tesla Owner API authorization token')
 
   argumentParser.add_argument('-d', '--debug', dest='debug', required=False,
@@ -50,9 +50,6 @@ def NormalizeArguments(options, e_mail, password):
   if options.debug and options.quiet:
     # cannot have it both ways -- debug trumps quiet
     options.quiet= False
-
-  # convert lists of single strings into strings
-  options.output = str(options.output.pop())
 
   # instantiate secret e-mail and password parameters
   if e_mail:
@@ -75,7 +72,7 @@ def main():
     secret= json.loads(secret)
   except:
     print('Failed to provide properly formatted (JSON) login information as input.')
-    print('Treminating...')
+    print('Terminating...')
   else:
     try:
       # instantiate our Tesla API and initialize from command line arguments
@@ -90,7 +87,7 @@ def main():
       # write it out to our designated output file (or STDOUT if none)
       if options.output:
         with open(options.output, 'w') as output_file:
-          json.dump(request.get_token(), output_file)
+          json.dump(request.get_token(), output_file, sort_keys=True, indent=4, separators=(',', ': '))
       else:
         print(json.dumps(request.get_token(), sort_keys=True, indent=4, separators=(',', ': ')))
 

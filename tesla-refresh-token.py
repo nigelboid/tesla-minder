@@ -7,14 +7,15 @@
 
 import argparse
 import json
+import sys
 import datetime
-
+from teslarequest import TeslaRequest
 
 #
 # Define some global constants
 #
 
-VERSION= '0.0.6'
+VERSION= '0.0.1'
 
 KEY_TOKEN= 'access_token'
 KEY_TOKEN_CREATION= 'created_at'
@@ -38,13 +39,16 @@ def GetArguments():
     dest='token_file', required=True, action='store',
     help='Tesla Owner API authorization token file')
 
-  argumentParser.add_argument('-d', '--days',
+  argumentParser.add_argument('--days',
     dest='min_expiration_days', type=int, required=False, action='store',
     default=MINIMUM_DAYS_REMAINING,
-    help='Minimum days remaining before expiration to trigger an alert')
+    help='Minimum days remaining before expiration to trigger a refresh')
 
-  argumentParser.add_argument('--debug', dest='debug', required=False,
-    action='store_true', default=False, help='Turn on verbose diagnostics')
+  diagnostics= argumentParser.add_mutually_exclusive_group()
+  diagnostics.add_argument('-d', '--debug', dest='debug', required=False,
+    action='store_true', default=False, help='Activate verbose diagnostics')
+  diagnostics.add_argument('-q', '--quiet', dest='quiet', required=False,
+    action='store_true', default=False, help='Suppress non-critical messages')
 
   argumentParser.add_argument('-v', '--version', action='version',
     version='%(prog)s '+VERSION)
@@ -64,12 +68,16 @@ def GetToken(options):
   time_remaining= token_expiration - datetime.datetime.now()
 
   if options.debug:
-    print('{:>23}: {}'.format('Token', token[KEY_TOKEN]))
+    print()
+    print('{:>23}: {}'.format('Token (access)', token[KEY_TOKEN]))
+    print('{:>23}: {}'.format('Token (refresh)', token[KEY_TOKEN_REFRESH]))
     print('{:>23}: {}'.format('Token type', token[KEY_TOKEN_TYPE]))
     print('{:>23}: {}'.format('Token created', token_creation))
     print('{:>23}: {}'.format('Token expires', token_expiration))
     print('{:>23}: {}'.format('Token life remaining', time_remaining))
 
+  options.token= token
+  
   return time_remaining.days
 
 
@@ -80,7 +88,7 @@ def PluralS(number):
     return ''
   else:
     return 's'
-  
+
 
 # Main entry point
 #
@@ -88,21 +96,23 @@ def main():
   try:
     # instantiate our Tesla API and initialize from command line arguments
     options= GetArguments()
-    days= GetToken(options)
-    
-    # figure out what we have
-    if (days > options.min_expiration_days):
-      if options.debug:
-        print('')
-        print('Token expires in {} day{} ({} day{} threshold).'.format(
-          days, PluralS(days), options.min_expiration_days, PluralS(options.min_expiration_days)))
-    elif days >= 1:
-      print('Time to refresh the token ({} day{} remaining)!'.format(days, PluralS(days)))
-    elif days == 0:
-      print('Time to refresh the token (no time left)!')
-    else:
-      print('Time to refresh the token (overdue by {} day{})!'.format(-days, PluralS(-days)))
+    days_remaining= GetToken(options)
+    request= TeslaRequest(options)
 
+    # figure out what we have
+    if options.debug:
+      print('')
+      print('{:>18}: {}'.format('URL', request.get_url()))
+      
+    request.force_token_refresh()
+    
+    # write it out to our designated output file (or STDOUT if none)
+    with open(options.token_file, 'w') as token_file:
+      json.dump(request.get_token(), token_file, sort_keys=True, indent=4, separators=(',', ': '))
+      
+    if options.debug:
+      print('')
+      print(json.dumps(request.get_token(), sort_keys=True, indent=4, separators=(',', ': ')))
 
   except Exception as error:
     print(type(error))
@@ -112,7 +122,9 @@ def main():
 
   else:
     if options.debug:
+      print('')
       print('All done!')
+      print('')
 
 
 #
