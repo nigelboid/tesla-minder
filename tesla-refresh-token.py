@@ -56,7 +56,7 @@ def GetArguments():
   return argumentParser.parse_args()
 
 
-# Read and validate our token from the specified file
+# Read our token from the specified file
 #
 def GetToken(options):
   input_file= open(options.token_file)

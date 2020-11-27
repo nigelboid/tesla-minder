@@ -10,7 +10,7 @@ import time
 # Define some global constants
 #
 
-VERSION= '0.2.1'
+VERSION= '0.2.2'
 MAX_ATTEMPTS= 20
 
 # API request building blocks
@@ -50,7 +50,9 @@ KEY_TOKEN_CREATION= 'created_at'
 KEY_TOKEN_EXPIRATION= 'expires_in'
 KEY_TOKEN_TYPE= 'token_type'
 KEY_TOKEN_REFRESH= 'refresh_token'
-KEY_TOKEN_URL= 'owner_url'
+KEY_TOKEN_URL= KEY_API_BASEURL
+KEY_TOKEN_ID= KEY_API_ID
+KEY_TOKEN_SECRET= KEY_API_SECRET
 
 KEY_VEHICLES= 'response'
 KEY_VEHICLE_COUNT= 'count'
@@ -109,38 +111,39 @@ class TeslaRequest:
   def __init__(self, arguments):
     # First, validate our debug and quiet flags
     if hasattr(arguments, 'debug'):
-      self.debug= arguments.debug
+      self.__debug= arguments.debug
     else:
-      self.debug= False
+      self.__debug= False
       
     if hasattr(arguments, 'quiet'):
-      self.quiet= arguments.quiet
+      self.__quiet= arguments.quiet
     else:
-      self.quiet= False
+      self.__quiet= False
 
 
     # Instantiate internal cache
-    self.cache= {}
+    self.__cache= {}
 
     # Validate required values
+    self.__token_refreshed= False
     if hasattr(arguments, 'token'):
-      self.token= arguments.token
+      self.__token= arguments.token
     else:
-      self.token= None
+      self.__token= None
 
     if hasattr(arguments, 'e_mail'):
-      self.e_mail= arguments.e_mail
+      self.__e_mail= arguments.e_mail
     else:
-      self.e_mail= None
+      self.__e_mail= None
     if hasattr(arguments, 'password'):
-      self.password= arguments.password
+      self.__password= arguments.password
     else:
-      self.password= None
+      self.__password= None
 
     if hasattr(arguments, 'cache_expiration_limit'):
-      self.cache_expiration_limit= arguments.cache_expiration_limit
+      self.__cache_expiration_limit= arguments.cache_expiration_limit
     else:
-      self.cache_expiration_limit= CACHE_EXPIRATION_LIMIT
+      self.__cache_expiration_limit= CACHE_EXPIRATION_LIMIT
       
     self.__cache_token()
     self.__cache_vehicles()
@@ -163,7 +166,7 @@ class TeslaRequest:
         
         return owner_api
       else:
-        if self.debug:
+        if self.__debug:
           raise Exception('Could not obtain Owner API parameters (status code {})'.format(
             owner_api_response.status_code), self)
         else:
@@ -171,7 +174,7 @@ class TeslaRequest:
             owner_api_response.status_code))
             
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Failed to obtain expected Owner API parameters')
         print(owner_api_response)
       raise error
@@ -179,12 +182,12 @@ class TeslaRequest:
 
   # Validate current access token or obtain and cache a refreshed or a new one
   def __cache_token(self):
-    if self.token:
+    if self.__token:
       if not self.__is_token_valid():
         self.__refresh_token()
         
     else:
-      if self.e_mail and self.password:
+      if self.__e_mail and self.__password:
         self.__get_token()
       else:
         raise Exception('Could not obtain a token (no credentials to obtain a new one)!', self)
@@ -193,29 +196,37 @@ class TeslaRequest:
   # Refresh access token
   def __refresh_token(self):
     try:
-      owner_api= self.__get_owner_api_parameters()
+      owner_api= {}
+      owner_api[API_VERSION]= {}
       
-      owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
-      request= owner_url + REQUEST_TOKEN
+      owner_api[API_VERSION][KEY_API_BASEURL]= self.__token[KEY_TOKEN_URL]
+      owner_api[API_VERSION][KEY_API_ID]= self.__token[KEY_TOKEN_ID]
+      owner_api[API_VERSION][KEY_API_SECRET]= self.__token[KEY_TOKEN_SECRET]
+      
+      request= self.__token[KEY_TOKEN_URL] + REQUEST_TOKEN
       payload= {
         'grant_type' : 'refresh_token',
-  			'client_id' : owner_api[API_VERSION][KEY_API_ID],
-  			'client_secret' : owner_api[API_VERSION][KEY_API_SECRET],
-  			'refresh_token' : self.token[KEY_TOKEN_REFRESH],
+  			'client_id' : self.__token[KEY_TOKEN_ID],
+  			'client_secret' : self.__token[KEY_TOKEN_SECRET],
+  			'refresh_token' : self.__token[KEY_TOKEN_REFRESH]
       }
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Failed to formulate refresh token request')
       raise error
 
     response= requests.post(request, json= payload)
 
     if response.status_code == STATUS_CODE_OK:
-      self.token= response.json()
-      self.token[KEY_TOKEN_URL]= owner_url
-      return True
+      self.__token= response.json()
+      self.__token[KEY_TOKEN_URL]= owner_api[API_VERSION][KEY_API_BASEURL]
+      self.__token[KEY_TOKEN_ID]= owner_api[API_VERSION][KEY_API_ID]
+      self.__token[KEY_TOKEN_SECRET]= owner_api[API_VERSION][KEY_API_SECRET]
+      self.__token_refreshed= True
+      
+      return self.__token_refreshed
     else:
-      if self.debug:
+      if self.__debug:
         raise Exception('Failed to obtain token (status code {})'.format(
           response.status_code), self, request, payload)
       else:
@@ -230,28 +241,31 @@ class TeslaRequest:
     try:
       owner_api= self.__get_owner_api_parameters()
       
-      owner_url= owner_api[API_VERSION][KEY_API_BASEURL]
-      request= owner_url + REQUEST_TOKEN
+      request= owner_api[API_VERSION][KEY_API_BASEURL] + REQUEST_TOKEN
       payload= {
         'grant_type' : 'password',
   			'client_id' : owner_api[API_VERSION][KEY_API_ID],
   			'client_secret' : owner_api[API_VERSION][KEY_API_SECRET],
-  			'email' : self.e_mail,
-  			'password' : self.password,
+  			'email' : self.__e_mail,
+  			'password' : self.__password,
       }
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Failed to formulate new token request')
       raise error
 
     response= requests.post(request, json= payload)
 
     if response.status_code == STATUS_CODE_OK:
-      self.token= response.json()
-      self.token[KEY_TOKEN_URL]= owner_url
-      return True
+      self.__token= response.json()
+      self.__token[KEY_TOKEN_URL]= owner_api[API_VERSION][KEY_API_BASEURL]
+      self.__token[KEY_TOKEN_ID]= owner_api[API_VERSION][KEY_API_ID]
+      self.__token[KEY_TOKEN_SECRET]= owner_api[API_VERSION][KEY_API_SECRET]
+      self.__token_refreshed= True
+      
+      return self.__token_refreshed
     else:
-      if self.debug:
+      if self.__debug:
         raise Exception('Failed to obtain token (status code {})'.format(
           response.status_code), self, request, payload)
       else:
@@ -262,7 +276,7 @@ class TeslaRequest:
   # Validate our current token
   def __is_token_valid(self):
     return (
-      time.time() < (self.token[KEY_TOKEN_CREATION] + self.token[KEY_TOKEN_EXPIRATION])
+      time.time() < (self.__token[KEY_TOKEN_CREATION] + self.__token[KEY_TOKEN_EXPIRATION])
       )
 
 
@@ -273,10 +287,10 @@ class TeslaRequest:
     response= requests.get(request, headers= self.get_headers())
 
     if response.status_code == STATUS_CODE_OK:
-      self.vehicles= response.json()
+      self.__vehicles= response.json()
       return True
     else:
-      if self.debug:
+      if self.__debug:
         raise Exception('Failed to obtain owned vehicles (status code {})'.format(
           response.status_code), self, request)
       else:
@@ -298,14 +312,14 @@ class TeslaRequest:
       
       if response.status_code == STATUS_CODE_OK:
         state= response.json()[KEY_RESPONSE]
-        state[KEY_CACHE_EXPIRATION]= time.time() + self.cache_expiration_limit
+        state[KEY_CACHE_EXPIRATION]= time.time() + self.__cache_expiration_limit
   
-        if vehicle_index not in self.cache:
-          self.cache[vehicle_index]= {}
-        self.cache[vehicle_index][state_type]= state
+        if vehicle_index not in self.__cache:
+          self.__cache[vehicle_index]= {}
+        self.__cache[vehicle_index][state_type]= state
           
       else:
-        if self.debug:
+        if self.__debug:
           if (attempts > 1):
             plural_s= "s"
           else:
@@ -324,15 +338,15 @@ class TeslaRequest:
   # Return state for the specified vehicle
   def __get_state(self, vehicle_index, state_type):
     try:
-      if ((vehicle_index not in self.cache)
-        or (state_type not in self.cache[vehicle_index])
-        or (self.cache[vehicle_index][state_type][KEY_CACHE_EXPIRATION] < time.time())):
+      if ((vehicle_index not in self.__cache)
+        or (state_type not in self.__cache[vehicle_index])
+        or (self.__cache[vehicle_index][state_type][KEY_CACHE_EXPIRATION] < time.time())):
           self.__cache_state(vehicle_index, state_type)
 
-      return self.cache[vehicle_index][state_type]
+      return self.__cache[vehicle_index][state_type]
 
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain state of vehicle named "{}" from cache'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -355,11 +369,11 @@ class TeslaRequest:
       if response.status_code == STATUS_CODE_OK:
         if response.json()[STATUS_RESPONSE][KEY_VEHICLE_ONLINE_STATE] == VALUE_STATE_ONLINE_ONLINE:
           awake= True
-          self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]= VALUE_STATE_ONLINE_ONLINE
+          self.__vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]= VALUE_STATE_ONLINE_ONLINE
           break
 
     if not awake:
-      if self.debug:
+      if self.__debug:
         raise Exception('Could not wake up vehicle'
           + ' named "{}" (response code {}, status is {})'.format(
             self.get_vehicle_name(vehicle_index), response.status_code,
@@ -376,25 +390,35 @@ class TeslaRequest:
 
   # Expire indicated state cache
   def __expire_cache(self, vehicle_index, state_type):
-    self.cache[vehicle_index][state_type][KEY_CACHE_EXPIRATION]= 0
+    self.__cache[vehicle_index][state_type][KEY_CACHE_EXPIRATION]= 0
               
 
   # Formulate and return stored token parameters
   def get_token(self):
     try:
-      return self.token
+      return self.__token
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('No token parameters set!')
       raise error
+
+
+  # Force refresh of our access token
+  def force_token_refresh(self):
+    self.__refresh_token()
+
+
+  # Do we have a refreshed token (make sure to save it!)
+  def is_token_refreshed(self):
+    return self.__token_refreshed
 
 
   # Formulate and return stored Owner API URL
   def get_url(self):
     try:
-      return self.token[KEY_TOKEN_URL]
+      return self.__token[KEY_TOKEN_URL]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('No Owner API URL set!')
       raise error
 
@@ -403,11 +427,11 @@ class TeslaRequest:
   def get_headers(self):
     try:
       return {
-        'Authorization' : self.token[KEY_TOKEN_TYPE] + ' ' + self.token[KEY_TOKEN],
+        'Authorization' : self.__token[KEY_TOKEN_TYPE] + ' ' + self.__token[KEY_TOKEN],
         'User-Agent' : 'teslarequest.py'
         }
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Failed to formulate Owner API request headers!')
       raise error
 
@@ -415,9 +439,9 @@ class TeslaRequest:
   # Return count of stored vehicles
   def get_vehicle_count(self):
     try:
-      return self.vehicles[KEY_VEHICLE_COUNT]
+      return self.__vehicles[KEY_VEHICLE_COUNT]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('No vehicles stored!')
       raise error
 
@@ -425,9 +449,9 @@ class TeslaRequest:
   # Return the name of the specified vehicle
   def get_vehicle_name(self, vehicle_index):
     try:
-      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_NAME]
+      return self.__vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_NAME]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access the name of vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -435,9 +459,9 @@ class TeslaRequest:
   # Return the ID of the specified vehicle
   def get_vehicle_id(self, vehicle_index):
     try:
-      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ID]
+      return self.__vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ID]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access the ID of vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -445,9 +469,9 @@ class TeslaRequest:
   # Return the online state of the specified vehicle
   def get_vehicle_online_state(self, vehicle_index):
     try:
-      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]
+      return self.__vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_ONLINE_STATE]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access the online state of vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -455,9 +479,9 @@ class TeslaRequest:
   # Return the in-service state of the specified vehicle
   def is_vehicle_in_service(self, vehicle_index):
     try:
-      return self.vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_INSERVICE_STATE]
+      return self.__vehicles[KEY_VEHICLES][vehicle_index][KEY_VEHICLE_INSERVICE_STATE]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access the in-service state of vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -467,7 +491,7 @@ class TeslaRequest:
     try:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access general state for vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -477,7 +501,7 @@ class TeslaRequest:
     try:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_DRIVE)
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access drive state for vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -487,7 +511,7 @@ class TeslaRequest:
     try:
       return self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not access charge state for vehicle #{}'.format(vehicle_index))
       raise error
 
@@ -518,7 +542,7 @@ class TeslaRequest:
       return open_doors
 
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain open doors and trunks for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -532,7 +556,7 @@ class TeslaRequest:
       return (state['latitude'], state['longitude'])
 
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain location for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -544,7 +568,7 @@ class TeslaRequest:
       return self.__get_state(
         vehicle_index, REQUEST_DATA_STATE_VEHICLE)[KEY_STATE_VEHICLE_LOCKED]
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain locked state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -560,7 +584,7 @@ class TeslaRequest:
       else:
         return VALUE_STATE_UNKNOWN
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain HomeLink state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -576,7 +600,7 @@ class TeslaRequest:
       else:
         return VALUE_STATE_UNKNOWN
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain Sentry Mode state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -592,7 +616,7 @@ class TeslaRequest:
       else:
         return False
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain parked state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -610,7 +634,7 @@ class TeslaRequest:
           
         or self.is_vehicle_charging(vehicle_index))
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain charging state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -622,7 +646,7 @@ class TeslaRequest:
       return (self.__get_state(vehicle_index, REQUEST_DATA_STATE_CHARGE)[KEY_STATE_CHARGE_STATE]
           in VALUE_STATE_CHARGE_CHARGING_NOW)
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain charging state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -634,7 +658,7 @@ class TeslaRequest:
       return (self.__get_state(
         vehicle_index, REQUEST_DATA_STATE_CHARGE)[VALUE_STATE_CHARGE_BATTERY_LEVEL])
     except Exception as error:
-      if self.debug:
+      if self.__debug:
         print('Could not obtain charging state for vehicle named "{}"'.format(
           self.get_vehicle_name(vehicle_index)))
       raise error
@@ -652,7 +676,7 @@ class TeslaRequest:
     if response.status_code == STATUS_CODE_OK:
       return response.json()[STATUS_RESPONSE][STATUS_RESPONSE_RESULT]
     else:
-      if self.debug:
+      if self.__debug:
         raise Exception('Failed to issue command "{}" to vehicle named "{}" (status code {})'.format(command, self.get_vehicle_name(vehicle_index), response.status_code), self, request, response.json())
       else:
         raise Exception('Failed to issue command "{}" to vehicle named "{}" (status code {})'.format(command, self.get_vehicle_name(vehicle_index), response.status_code))
@@ -691,8 +715,3 @@ class TeslaRequest:
     payload= {'on' : False}
     self.__expire_cache(vehicle_index, REQUEST_DATA_STATE_VEHICLE)
     return self.issue_command(vehicle_index, 'set_sentry_mode', payload)
-
-
-  # Force refresh of our access token
-  def force_token_refresh(self):
-    self.__refresh_token()

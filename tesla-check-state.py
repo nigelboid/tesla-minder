@@ -7,7 +7,7 @@
 
 import argparse
 import json
-#import datetime
+import datetime
 import geopy.distance
 from teslarequest import TeslaRequest
 
@@ -16,12 +16,20 @@ from teslarequest import TeslaRequest
 # Define some global constants
 #
 
-VERSION= '0.1.0'
+VERSION= '0.1.1'
 
-MINIMUM_CHARGING_LEVEL= 50  # percent
-DEFAULT_CHARGING_LIMIT= 80  # percent
+KEY_TOKEN= 'access_token'
+KEY_TOKEN_CREATION= 'created_at'
+KEY_TOKEN_EXPIRATION= 'expires_in'
+KEY_TOKEN_TYPE= 'token_type'
+KEY_TOKEN_REFRESH= 'refresh_token'
 
-MAXIMUM_NEAR_DISTANCE= 30   # meters
+MINIMUM_CHARGING_LEVEL= 50        # percent
+DEFAULT_CHARGING_LIMIT= 80        # percent
+
+MAXIMUM_NEAR_DISTANCE= 30         # meters
+
+MINIMUM_TOKEN_DAYS_REMAINING= 5   #days
 
 
 #
@@ -36,6 +44,11 @@ def GetArguments():
   argumentParser.add_argument('-t', '--token', '--token-file',
     nargs=1, dest='token_file', required=True, action='store',
     help='Tesla Owner API authorization token file')
+
+  argumentParser.add_argument('--days', '--token-days', '--token-minimum-days',
+    dest='min_expiration_days', type=int, required=False, action='store',
+    default=MINIMUM_TOKEN_DAYS_REMAINING,
+    help='Minimum days remaining before token expiration to trigger a remedial action')
 
   argumentParser.add_argument('-b', '--level', '--battery-level',
     nargs=1, dest='min_battery_level', type=int, required=False, action='store',
@@ -90,13 +103,57 @@ def NormalizeArguments(options):
   return options
 
 
-# Read and validate our token from the specified file
+# Read our token from the specified file
 #
 def GetToken(options):
-  input_file= open(options.token_file)
-  options.token= json.loads(input_file.read())
+  with open(options.token_file, 'r') as token_file:
+    options.token= json.loads(token_file.read())
 
   return options
+
+
+# Report token state
+#
+def ReportToken(options, request):
+  token= request.get_token() 
+
+  token_creation= datetime.datetime.fromtimestamp(token[KEY_TOKEN_CREATION])
+  token_expiration= datetime.datetime.fromtimestamp(token[KEY_TOKEN_CREATION]
+                    + token[KEY_TOKEN_EXPIRATION])
+
+  time_remaining= token_expiration - datetime.datetime.now()
+
+  if options.debug:
+    print('')
+    print('{:>23}: {}'.format('Token', token[KEY_TOKEN]))
+    print('{:>23}: {}'.format('Token type', token[KEY_TOKEN_TYPE]))
+    print('{:>23}: {}'.format('Token created', token_creation))
+    print('{:>23}: {}'.format('Token expires', token_expiration))
+    print('{:>23}: {}'.format('Token life remaining', time_remaining))
+    print('{:>23}: {}'.format('Refreshed token', request.is_token_refreshed()))
+    print('')
+
+  return time_remaining.days
+
+
+# Refresh our token and preserve it
+#
+def RefreshToken(options, request, days):
+  if not options.quiet:
+    if days > 0:
+      print('Refreshing token due to expire in {} day{}...'.format(
+        days, PluralS(days)))
+    elif days == 0:
+      print('Refreshing token due to expire today!')
+    else:
+      print('Refreshing expired token!')
+  
+  request.force_token_refresh()
+  
+  with open(options.token_file, 'w') as token_file:
+    json.dump(request.get_token(), token_file, sort_keys=True, indent=4, separators=(',', ': '))
+
+  return ReportToken(options, request)
 
 
 # Check vehicle doors, trunks, and locked state
@@ -267,6 +324,12 @@ def main():
     options= NormalizeArguments(GetArguments())
     options= GetToken(options)
     request= TeslaRequest(options)
+    
+    # check the token first
+    token_days_remaining= ReportToken(options, request)
+    if token_days_remaining <= options.min_expiration_days:
+      RefreshToken(options, request, token_days_remaining)
+  
 
     # figure out what we have
     vehicle_count= request.get_vehicle_count()
